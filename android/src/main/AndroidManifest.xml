@@ -1,2 +1,53 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+  <!-- Required by React Native's HeadlessJsTaskService (kill-state JS execution) -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+
+    <!-- Foreground service — the single active location source. Runs FusedLocation
+         with foregroundServiceType=location, so the OS grants continuous fresh GPS
+         in the background & after kill (this is what shows the location indicator). -->
+    <service
+      android:name=".BgGeolocationForegroundService"
+      android:foregroundServiceType="location"
+      android:exported="false"
+      android:stopWithTask="false" />
+
+    <!-- Boot receiver — restarts tracking after device reboot -->
+    <receiver
+      android:name=".BgGeolocationBootReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+      </intent-filter>
+    </receiver>
+
+    <!-- Activity recognition receiver — receives motion activity updates from Play Services -->
+    <receiver
+      android:name=".BgGeolocationActivityRecognitionReceiver"
+      android:exported="false" />
+
+    <!-- Geofence receiver — receives ENTER/EXIT/DWELL transitions (bg + kill state) -->
+    <receiver
+      android:name=".BgGeolocationGeofenceReceiver"
+      android:exported="false" />
+
+    <!-- HeadlessTask service — executes JS in a headless context when app is killed -->
+    <service
+      android:name=".BgGeolocationHeadlessTask"
+      android:exported="false" />
+
+  </application>
+
 </manifest>

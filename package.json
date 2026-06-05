@@ -1,6 +1,6 @@
 {
   "name": "react-native-bg-geolocation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Background geolocation tracking for React Native",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -41,13 +41,19 @@
   "keywords": [
     "react-native",
     "ios",
-    "android"
+    "android",
+    "background",
+    "geolocation",
+    "location",
+    "tracking",
+    "geofence",
+    "gps"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zohaibnaseer/react-native-bg-geolocation.git"
   },
-  "author": "Zohaib Naseer <zohaibnaseer2244@gmail.com> (https://github.com/zohaibnaseer)",
+  "author": "Zohaib Naseer <zohaibnaseer2244@gmail.com> (https://github.com/zohaibnaseer786)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/zohaibnaseer/react-native-bg-geolocation/issues"
@@ -96,7 +102,8 @@
       [
         "typescript",
         {
-          "project": "tsconfig.build.json"
+          "project": "tsconfig.build.json",
+          "tsc": "./node_modules/.bin/tsc"
         }
       ]
     ]

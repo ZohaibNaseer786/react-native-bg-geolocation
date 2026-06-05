@@ -29,6 +29,7 @@ DerivedData
 *.xcuserstate
 project.xcworkspace
 **/.xcode.env.local
+example/ios/.metro-host
 
 # Android/IJ
 #
@@ -61,8 +62,16 @@ buck-out/
 android/app/libs
 android/keystores/debug.keystore
 
+node_modules
+.next
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+
 # Yarn
 .yarn/*
+web/.yarn/*
+web/node_modules/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases

@@ -20,10 +20,24 @@ export default defineConfig([
     plugins: { prettier },
     rules: {
       'react/react-in-jsx-scope': 'off',
-      'prettier/prettier': 'error',
+      'prettier/prettier': [
+        'error',
+        {
+          quoteProps: 'consistent',
+          singleQuote: true,
+          tabWidth: 2,
+          trailingComma: 'es5',
+          useTabs: false,
+        },
+      ],
     },
   },
   {
-    ignores: ['node_modules/', 'lib/'],
+    ignores: [
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/.yarn/**',
+      'lib/**',
+    ],
   },
 ]);

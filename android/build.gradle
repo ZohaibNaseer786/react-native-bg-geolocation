@@ -64,4 +64,6 @@ android {
 
 dependencies {
   implementation "com.facebook.react:react-android"
+  implementation "com.google.android.gms:play-services-location:21.0.1"
+  implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }

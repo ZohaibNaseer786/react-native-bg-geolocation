@@ -1,0 +1,329 @@
+/**
+ * App-level background location orchestrator.
+ *
+ * Mirrors the production MasjidPilot `backgroundLocationService.ts` structure:
+ *   - registerListeners()          — onLocation / onHeartbeat / onProviderChange
+ *   - ensureReady()                — BackgroundGeolocation.ready() once
+ *   - startBackgroundTracking()    — request permission → connect socket → start
+ *   - stopBackgroundTracking()     — stop + disconnect
+ *   - headless task registered at MODULE SCOPE (bottom of file)
+ *
+ * Delivery is SOCKET-ONLY (no native HTTP), exactly like the working app.
+ * The headless task connects the socket fresh in the kill-state JS context.
+ */
+import { Platform } from 'react-native';
+import BackgroundGeolocation, {
+  type Config,
+  type HeadlessEvent,
+  type HeartbeatEvent,
+  type Location,
+  type LocationError,
+  type State,
+  type Subscription,
+} from 'react-native-bg-geolocation';
+import {
+  AUTH_TOKEN,
+  SERVER_BASE_URL,
+  connectLocationSocket,
+  disconnectLocationSocket,
+  sendLocationToSocket,
+  type Coordinates,
+} from './locationSocketService';
+
+const LOCATION_SOCKET_INTERVAL_MS = 60 * 1000;
+const LOCATION_SOCKET_HEARTBEAT_SECONDS = 60;
+
+let readyPromise: Promise<State> | null = null;
+let subscriptions: Subscription[] = [];
+let foregroundInterval: ReturnType<typeof setInterval> | null = null;
+let lastSocketLocationSentAt = 0;
+
+// Optional UI hooks (so the example screen can render live state)
+export interface BgLocationHooks {
+  onEvent?: (msg: string) => void;
+  onLocation?: (location: Location) => void;
+  onMotionChange?: (isMoving: boolean, activity?: string) => void;
+  onEnabledChange?: (enabled: boolean) => void;
+  onSocketStatus?: (
+    status: 'connecting' | 'connected' | 'disconnected'
+  ) => void;
+}
+let hooks: BgLocationHooks = {};
+export function setBgLocationHooks(h: BgLocationHooks) {
+  hooks = h;
+}
+
+const log = (msg: string) => {
+  console.log('[BgGeoTest][BackgroundLocation]', msg);
+  hooks.onEvent?.(msg);
+};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function toCoordinates(location: Location): Coordinates {
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+  };
+}
+
+/**
+ * Send a location to the socket, throttled to once per minute (unless forced).
+ */
+async function sendLocationUpdate(
+  location: Location,
+  options: { force?: boolean } = {}
+): Promise<void> {
+  const now = Date.now();
+  if (
+    !options.force &&
+    lastSocketLocationSentAt > 0 &&
+    now - lastSocketLocationSentAt < LOCATION_SOCKET_INTERVAL_MS
+  ) {
+    return;
+  }
+  log(
+    `→ sending location ${location.coords.latitude.toFixed(5)}, ${location.coords.longitude.toFixed(5)} (force=${!!options.force})`
+  );
+  const sent = await sendLocationToSocket(toCoordinates(location));
+  if (sent) {
+    lastSocketLocationSentAt = now;
+    log('✅ socket send OK');
+  } else {
+    log('❌ socket send failed');
+  }
+}
+
+/**
+ * On heartbeat, use the heartbeat's location if present, otherwise fetch a fix.
+ */
+async function sendHeartbeatLocation(event?: HeartbeatEvent): Promise<void> {
+  try {
+    log('💓 heartbeat');
+    const location =
+      event?.location?.coords != null
+        ? event.location
+        : await BackgroundGeolocation.getCurrentPosition({
+            samples: 1,
+            persist: true,
+            maximumAge: LOCATION_SOCKET_INTERVAL_MS,
+            timeout: 30,
+          });
+    await sendLocationUpdate(location, { force: true });
+  } catch {
+    log('heartbeat: location unavailable');
+  }
+}
+
+function startForegroundInterval(): void {
+  if (foregroundInterval) return;
+  foregroundInterval = setInterval(() => {
+    log('⏱ foreground interval');
+    sendHeartbeatLocation().catch(() => {});
+  }, LOCATION_SOCKET_INTERVAL_MS);
+}
+
+function stopForegroundInterval(): void {
+  if (foregroundInterval) {
+    clearInterval(foregroundInterval);
+    foregroundInterval = null;
+  }
+}
+
+// ─── Config ─────────────────────────────────────────────────────────────────
+function getConfig(): Config {
+  return {
+    reset: false,
+    geolocation: {
+      desiredAccuracy: BackgroundGeolocation.DesiredAccuracy.High,
+      distanceFilter: 10,
+      locationAuthorizationRequest: 'Always',
+      pausesLocationUpdatesAutomatically: false,
+      showsBackgroundLocationIndicator: true,
+      stopTimeout: 5,
+    },
+    app: {
+      stopOnTerminate: false,
+      startOnBoot: true,
+      enableHeadless: true,
+      heartbeatInterval: LOCATION_SOCKET_HEARTBEAT_SECONDS,
+      preventSuspend: true,
+      foregroundService: true,
+      notification: {
+        sticky: true,
+        title: 'Location is active',
+        text: 'Tracking your location in the background.',
+        channelName: 'Background location',
+      },
+      backgroundPermissionRationale: {
+        title: 'Allow location in the background',
+        message:
+          'This app needs Always location access to keep tracking when the app is closed.',
+        positiveAction: 'Open Settings',
+        negativeAction: 'Not now',
+      },
+    },
+    logger: {
+      debug: true,
+      logLevel: BackgroundGeolocation.LogLevel.Verbose,
+    },
+
+    // ── iOS kill-state delivery ───────────────────────────────────────────────
+    // On iOS the OS only wakes a force-quit app briefly (significant-change /
+    // stationary-region exit). Booting RN + the socket in that window is
+    // unreliable, so we let the NATIVE layer POST the fix directly to the REST
+    // endpoint the instant it's woken. Android keeps using the JS socket via the
+    // headless task (its foreground service makes that reliable).
+    ...(Platform.OS === 'ios'
+      ? {
+          persistence: {
+            url: `${SERVER_BASE_URL}/location`,
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${AUTH_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            autoSync: true,
+          },
+        }
+      : {}),
+  };
+}
+
+// ─── Listeners ──────────────────────────────────────────────────────────────
+function registerListeners(): void {
+  if (subscriptions.length > 0) return;
+
+  subscriptions = [
+    BackgroundGeolocation.onLocation(
+      (location: Location) => {
+        log(
+          `📍 onLocation ${location.coords.latitude.toFixed(5)}, ${location.coords.longitude.toFixed(5)} moving=${location.is_moving} activity=${location.activity?.type}`
+        );
+        hooks.onLocation?.(location);
+        sendLocationUpdate(location, { force: true }).catch(() => {});
+      },
+      (error: LocationError) => log(`location error: ${JSON.stringify(error)}`)
+    ),
+    BackgroundGeolocation.onHeartbeat((event: HeartbeatEvent) => {
+      sendHeartbeatLocation(event).catch(() => {});
+    }),
+    BackgroundGeolocation.onMotionChange((event: any) => {
+      log(
+        `🔄 motionchange isMoving=${event.isMoving} activity=${event.activity?.type}`
+      );
+      hooks.onMotionChange?.(!!event.isMoving, event.activity?.type);
+    }),
+    BackgroundGeolocation.onEnabledChange((enabled: boolean) => {
+      log(`enabledchange=${enabled}`);
+      hooks.onEnabledChange?.(enabled);
+    }),
+    BackgroundGeolocation.onProviderChange((event: any) => {
+      log(`providerchange enabled=${event.enabled} gps=${event.gps}`);
+    }),
+  ];
+}
+
+async function ensureReady(): Promise<State> {
+  if (!readyPromise) {
+    registerListeners();
+    readyPromise = BackgroundGeolocation.ready(getConfig());
+  }
+  return readyPromise;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+export interface StartResult {
+  permissionStatus: number;
+  started: boolean;
+}
+
+export async function startBackgroundTracking(): Promise<StartResult> {
+  log('starting app-level tracking');
+  const state = await ensureReady();
+
+  // Request "Always" permission
+  let permissionStatus: number;
+  const provider = await BackgroundGeolocation.getProviderState();
+  if (provider.status === BackgroundGeolocation.AuthorizationStatus.Always) {
+    permissionStatus = provider.status;
+  } else {
+    permissionStatus = await BackgroundGeolocation.requestPermission().catch(
+      () => BackgroundGeolocation.AuthorizationStatus.Denied
+    );
+  }
+
+  if (permissionStatus !== BackgroundGeolocation.AuthorizationStatus.Always) {
+    log(`tracking blocked — permission=${permissionStatus}`);
+    disconnectLocationSocket();
+    hooks.onSocketStatus?.('disconnected');
+    return { permissionStatus, started: false };
+  }
+
+  // Connect the socket while the app is alive (so it's warm).
+  hooks.onSocketStatus?.('connecting');
+  connectLocationSocket();
+  hooks.onSocketStatus?.('connected');
+
+  startForegroundInterval();
+
+  if (!state.enabled) {
+    log('native start()');
+    await BackgroundGeolocation.start();
+  } else {
+    log('native already enabled');
+  }
+
+  // Immediate first fix
+  await sendHeartbeatLocation();
+
+  return { permissionStatus, started: true };
+}
+
+export async function stopBackgroundTracking(): Promise<void> {
+  log('stopping tracking');
+  stopForegroundInterval();
+  disconnectLocationSocket();
+  hooks.onSocketStatus?.('disconnected');
+  lastSocketLocationSentAt = 0;
+
+  if (!readyPromise) return;
+  try {
+    const state = await BackgroundGeolocation.getState();
+    if (state.enabled) await BackgroundGeolocation.stop();
+  } catch {
+    // cleanup must never throw
+  }
+}
+
+// ─── Headless task (kill state) ────────────────────────────────────────────────
+// Registered at MODULE SCOPE so it's set up as soon as this file is imported,
+// exactly like the production app. In the kill-state JS context this connects a
+// fresh socket and sends the location.
+let headlessRegistered = false;
+function registerHeadlessTask(): void {
+  if (headlessRegistered) return;
+  headlessRegistered = true;
+
+  BackgroundGeolocation.registerHeadlessTask(async (event: HeadlessEvent) => {
+    console.log('[BgGeoTest][HEADLESS]', event.name);
+
+    if (event.name === 'heartbeat') {
+      await sendHeartbeatLocation(event.params as HeartbeatEvent);
+      return;
+    }
+    if (event.name !== 'location') return;
+
+    const location = event.params as Location;
+    if (!location?.coords) return;
+
+    console.log(
+      '[BgGeoTest][HEADLESS] 📍',
+      location.coords.latitude,
+      location.coords.longitude
+    );
+    await sendLocationUpdate(location, { force: true });
+  });
+}
+
+// Run immediately on import.
+registerHeadlessTask();

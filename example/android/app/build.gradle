@@ -25,7 +25,9 @@ react {
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
-    // nodeExecutableAndArgs = ["node"]
+    //   Pinned to a Node >= 19.4 because `/usr/local/bin/node` on this machine is
+    //   v18 which lacks os.availableParallelism() and breaks the Metro bundle task.
+    nodeExecutableAndArgs = ["/Users/tk-lpt-1043/.nvm/versions/node/v22.17.1/bin/node"]
     //
     //   The command to run when bundling. By default is 'bundle'
     // bundleCommand = "ram-bundle"

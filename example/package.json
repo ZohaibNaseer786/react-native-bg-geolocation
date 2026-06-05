@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "ios": "react-native run-ios",
-    "start": "react-native start",
+    "ios": "node ./scripts/write-ios-metro-host.js && react-native run-ios --scheme BgGeolocationExample --mode Debug",
+    "start": "react-native start --host 0.0.0.0",
     "build:android": "react-native build-android --extra-params \"--no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a\"",
     "build:ios": "react-native build-ios --mode Debug"
   },
   "dependencies": {
     "react": "19.2.3",
-    "react-native": "0.85.0"
+    "react-native": "0.85.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
