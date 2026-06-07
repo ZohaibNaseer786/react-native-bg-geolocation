@@ -1,14 +1,15 @@
 # react-native-bg-geolocation
 
-Background geolocation tracking for React Native — foreground, background, and **kill state** — with motion detection (moving/stationary), geofencing, and pluggable delivery (socket / HTTP / headless).
+Background geolocation tracking for React Native in foreground, background, Android kill state, and eligible iOS OS-managed relaunches, with motion detection (moving/stationary), geofencing, and pluggable delivery (socket / HTTP / headless).
 
 > Educational re-implementation of the `react-native-background-geolocation` API using only public platform APIs (FusedLocationProvider + Activity Recognition on Android, CoreLocation + CoreMotion + BGTaskScheduler on iOS). No proprietary binaries.
 
 ## Features
 
-- ✅ Foreground / background / **kill-state** location tracking
+- ✅ Foreground / background location tracking with OS relaunch-capable events
 - ✅ Moving ↔ stationary detection (motion state machine + activity recognition)
-- ✅ OS-owned location delivery that survives app kill (Android PendingIntent, iOS significant-change + visits)
+- ✅ OS-owned delivery (Android PendingIntent, iOS significant-change + regions)
+- ✅ iOS Live Activity for Lock Screen and Dynamic Island tracking status
 - ✅ Headless JS task (Android) for kill-state JS execution
 - ✅ Geofencing (`CLCircularRegion` / `GeofencingClient`)
 - ✅ Reboot persistence
@@ -36,6 +37,8 @@ Add to `Info.plist`:
 <key>UIBackgroundModes</key>
 <array>
   <string>location</string>
+  <!-- Required only when app.trackingAudioEnabled is approved and enabled. -->
+  <string>audio</string>
   <string>fetch</string>
   <string>processing</string>
 </array>
@@ -46,6 +49,50 @@ Add to `Info.plist`:
 ```
 
 Register the BGTask in `AppDelegate` (see the example app's `AppDelegate.swift`).
+
+#### iOS Live Activity
+
+Live Activities require iOS 16.2 or newer and a WidgetKit extension in the
+host application. The example includes a complete extension in
+`example/ios/BgGeolocationLiveActivity`.
+
+Add these keys to the app `Info.plist`:
+
+```xml
+<key>NSSupportsLiveActivities</key>
+<true/>
+<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+<true/>
+```
+
+Add `ios/liveactivity/TSLiveTrackingAttributes.swift` to the WidgetKit
+extension target and create an `ActivityConfiguration` for
+`TSLiveTrackingAttributes`. The package starts, updates, recovers, and ends the
+activity from native iOS location callbacks.
+
+#### iOS Tracking Audio
+
+For Apple-approved use cases, the package can run a real audible audio session
+beside Core Location while tracking is active:
+
+```ts
+app: {
+  trackingAudioEnabled: true,
+  trackingAudioVolume: 0.04,
+  trackingAudioMixWithOthers: true,
+}
+```
+
+Audio playback has no iOS runtime permission dialog. The host app must obtain
+clear user consent in its own UI before starting it. The app's Start and Stop
+actions control both tracking and audio. The package publishes the approved
+playback session through Now Playing, where Pause or Stop ends both playback and
+tracking. The tracking Live Activity remains a separate status surface. Add
+`audio` to `UIBackgroundModes` and enable this only
+for an audio use case and distribution model Apple has approved. Explicitly
+swiping the app away still terminates audio and location execution.
+Runtime status is available from
+`(await BackgroundGeolocation.getState()).trackingAudio`.
 
 ### Android
 
@@ -69,6 +116,14 @@ await BackgroundGeolocation.ready({
     startOnBoot: true,
     enableHeadless: true,
     heartbeatInterval: 60,
+    liveActivityEnabled: true,
+    liveActivityTitle: 'Live location',
+    liveActivitySubtitle: 'Background tracking is active',
+    // Enable only after adding Push Notifications and ActivityKit APNs.
+    liveActivityPushUpdates: false,
+    trackingAudioEnabled: true,
+    trackingAudioVolume: 0.04,
+    trackingAudioMixWithOthers: true,
     foregroundService: true,
     notification: { title: 'Tracking', text: 'Location is active' },
   },
@@ -116,7 +171,18 @@ BackgroundGeolocation.registerHeadlessTask(headlessTask);
 | Platform | Mechanism |
 |---|---|
 | **Android** | A FusedLocation `PendingIntent` is owned by the OS and delivered to a `BroadcastReceiver` even when the process is dead. A `START_STICKY` foreground service keeps the process priority high; `onTaskRemoved` reschedules it via `AlarmManager`. Kill-state events fire the **HeadlessJsTask**, where your JS runs. |
-| **iOS** | `startMonitoringSignificantLocationChanges` + `startMonitoringVisits` wake the app from kill state; `BGTaskScheduler` provides periodic refresh. `AppDelegate` re-arms monitoring before the bridge loads. |
+| **iOS** | Continuous background updates use Core Location. Significant-change and region events can relaunch an app that the system terminated. Each native fix is persisted before upload, and interrupted HTTP delivery is retried on the next native wake or launch. A Live Activity displays native tracking state and can receive server updates through ActivityKit APNs. If the person explicitly force-quits the app, iOS prevents Core Location relaunch until the app is opened again. |
+
+Live Activities do not collect location and do not provide unrestricted
+background execution. Their extension cannot access the network or receive
+location updates. Core Location performs tracking; ActivityKit presents the
+latest state. For updates while the app process is unavailable, read
+`(await BackgroundGeolocation.getState()).liveActivity.pushToken`, send it to
+your server, and update the activity through APNs using the
+`<bundle-id>.push-type.liveactivity` topic.
+
+Devices without a Dynamic Island, including iPhone 12, show the Live Activity
+on the Lock Screen rather than persistently in the status bar.
 
 ## API
 

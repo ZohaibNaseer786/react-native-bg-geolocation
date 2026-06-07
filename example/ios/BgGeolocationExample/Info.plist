@@ -45,6 +45,10 @@
 	<string>This app uses your location to track movement in the foreground.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>This app uses motion sensors to detect your movement state.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>This app connects to Metro on your Mac while running development builds.</string>
 	<key>NSBonjourServices</key>
@@ -55,6 +59,7 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>audio</string>
 		<string>location</string>
 		<string>fetch</string>
 		<string>processing</string>

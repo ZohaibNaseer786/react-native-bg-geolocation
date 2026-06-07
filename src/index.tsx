@@ -19,6 +19,7 @@ export type {
   AppConfig,
   LoggerConfig,
   PersistenceConfig,
+  LiveActivityState,
   NotificationConfig,
   State,
   DeviceInfo,
@@ -559,6 +560,12 @@ export default class BackgroundGeolocation {
   static requestPermission(): Promise<number> {
     return new Promise((resolve, reject) =>
       NativeBgGeolocation.requestPermission(resolve, reject)
+    );
+  }
+
+  static requestMotionPermission(): Promise<number> {
+    return new Promise((resolve, reject) =>
+      NativeBgGeolocation.requestMotionPermission(resolve, reject)
     );
   }
 

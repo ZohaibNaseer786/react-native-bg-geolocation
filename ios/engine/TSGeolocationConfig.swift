@@ -13,6 +13,13 @@ import CoreLocation
     @objc public var pausesLocationUpdatesAutomatically: Bool = false
     @objc public var showsBackgroundLocationIndicator: Bool = false
     @objc public var useSignificantChangesOnly: Bool = false
+    // When true, the engine never powers GPS down to the stationary state — it
+    // keeps continuous location updates running for the whole tracking session.
+    // Combined with showsBackgroundLocationIndicator this is the "ride app"
+    // behavior: the app stays alive in the background (location indicator shown)
+    // and tracks continuously instead of relying on motion/region wakeups.
+    // Higher battery cost; far more reliable background tracking.
+    @objc public var disableStopDetection: Bool = false
     @objc public var locationAuthorizationRequest: String = "Always"
     @objc public var locationAuthorizationAlert: [String: String] = [:]
     @objc public var disableLocationAuthorizationAlert: Bool = false
@@ -70,6 +77,7 @@ import CoreLocation
         pausesLocationUpdatesAutomatically = false
         showsBackgroundLocationIndicator = false
         useSignificantChangesOnly = false
+        disableStopDetection = false
         locationAuthorizationRequest = "Always"
         disableLocationAuthorizationAlert = false
         geofenceProximityRadius = 1000.0
@@ -107,6 +115,7 @@ import CoreLocation
             TSPropertySpec(name: "pausesLocationUpdatesAutomatically", type: "bool"),
             TSPropertySpec(name: "showsBackgroundLocationIndicator", type: "bool"),
             TSPropertySpec(name: "useSignificantChangesOnly", type: "bool"),
+            TSPropertySpec(name: "disableStopDetection", type: "bool"),
             TSPropertySpec(name: "locationAuthorizationRequest", type: "string"),
             TSPropertySpec(name: "disableLocationAuthorizationAlert", type: "bool"),
             TSPropertySpec(name: "geofenceProximityRadius", type: "double"),

@@ -2000,7 +2000,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  BgGeolocation: 028d7c06e0425debbf47d0770e1f3e2db64e664b
+  BgGeolocation: 3591b3a718777b3f607e2fed544fc506c0773506
   FBLazyVector: c00c20551d40126351a6783c47ce75f5b374851b
   hermes-engine: 4b1357ad0febd79ece53070c188a1bceee2bfdcd
   RCTDeprecation: 3bb167081b134461cfeb875ff7ae1945f8635257

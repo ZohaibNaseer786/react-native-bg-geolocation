@@ -14,11 +14,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // NOTE: TSLocationManager manages its own background lifecycle — significant
-    // location changes, CLVisit monitoring, geofence wakeups and the headless
-    // JS launch are all handled inside the engine. We only need the standard
-    // React Native bootstrap here; the engine re-arms itself on a kill-state
-    // relaunch via the UIApplicationLaunchOptionsLocationKey it inspects.
+    if launchOptions?[.location] != nil || application.applicationState == .background {
+      UserDefaults.standard.set(true, forKey: "TSLocationManager_didLaunchInBackground")
+      UserDefaults.standard.synchronize()
+    }
+
     let delegate = ReactNativeDelegate()
     let factory  = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -52,26 +52,10 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 #if targetEnvironment(simulator)
     return URL(string: "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false")
 #else
-    return Self.metroURLFromBundledIP()
-      ?? Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
 #else
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
-  }
-
-  private static func metroURLFromBundledIP() -> URL? {
-    guard let path = Bundle.main.path(forResource: "ip", ofType: "txt"),
-          let contents = try? String(contentsOfFile: path, encoding: .utf8)
-    else {
-      return nil
-    }
-
-    let host = contents.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !host.isEmpty else {
-      return nil
-    }
-
-    return URL(string: "http://\(host):8081/index.bundle?platform=ios&dev=true&minify=false")
   }
 }

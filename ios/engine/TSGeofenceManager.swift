@@ -55,9 +55,9 @@ import CoreLocation
     @objc public func start() {
         guard !enabled else { return }
         enabled = true
-        _mutateCL { mgr in
-            mgr.delegate = self
-        }
+        // NOTE: the CLLocationManager delegate is owned solely by TSCLRouter
+        // (see TSLocationManager.setupCoreLocation), which forwards region and
+        // location callbacks here. Do NOT assign mgr.delegate.
         reconcileMonitoredCacheFromCoreLocation()
     }
 

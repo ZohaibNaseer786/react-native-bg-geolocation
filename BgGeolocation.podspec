@@ -15,11 +15,11 @@ Pod::Spec.new do |s|
 
   # ObjC++ TurboModule wrapper + all Swift engine files.
   # No binary dependency — the engine is compiled from Swift source directly.
-  s.source_files = "ios/**/*.{h,m,mm,cpp}", "ios/engine/**/*.swift"
+  s.source_files = "ios/**/*.{h,m,mm,cpp}", "ios/engine/**/*.swift", "ios/liveactivity/**/*.swift"
 
   s.libraries    = 'sqlite3', 'z', 'stdc++'
-  s.frameworks   = "CoreLocation", "CoreMotion", "AudioToolbox", "UIKit", "CoreData",
-                   "MessageUI", "UserNotifications", "BackgroundTasks"
+  s.frameworks   = "CoreLocation", "CoreMotion", "AVFoundation", "AudioToolbox", "MediaPlayer", "UIKit", "CoreData",
+                   "MessageUI", "UserNotifications", "BackgroundTasks", "ActivityKit"
 
   install_modules_dependencies(s)
 end

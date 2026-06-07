@@ -21,7 +21,8 @@ import UIKit
 
     @objc public class func configureShared(withLocationManager manager: CLLocationManager) {
         sharedInstance().locationManager = manager
-        manager.delegate = sharedInstance()
+        // The CLLocationManager delegate is owned by TSCLRouter, which forwards
+        // authorization callbacks here. Do NOT assign manager.delegate.
     }
 
     // MARK: - State
@@ -36,6 +37,7 @@ import UIKit
     @objc public var pendingPolicy: String = ""
     @objc public var hasPendingPolicy: Bool = false
     @objc public var state: String = "idle"
+    @objc public var authorizationState: String = "not_determined"
     @objc public var authorizationTimeoutInterval: TimeInterval = 20.0
     @objc public var currentAlert: UIAlertController?
     public var pendingCompletion: ((CLAuthorizationStatus, Error?) -> Void)?
@@ -45,6 +47,7 @@ import UIKit
     @objc public override init() {
         super.init()
         authorizationStatus = CLLocationManager.authorizationStatus()
+        authorizationState = stateForAuthorizationStatus(authorizationStatus)
         registerForApplicationNotifications()
     }
 
@@ -52,7 +55,11 @@ import UIKit
         self.locationManager = locationManager
         super.init()
         authorizationStatus = CLLocationManager.authorizationStatus()
-        locationManager.delegate = self
+        authorizationState = stateForAuthorizationStatus(authorizationStatus)
+        // Do NOT assign locationManager.delegate here — the single delegate is
+        // owned by TSCLRouter. Assigning it would silently steal callbacks and
+        // re-introduce the multi-delegate bug. (This initializer is unused; the
+        // delegate line is removed to keep the invariant un-violatable.)
         registerForApplicationNotifications()
     }
 
@@ -105,12 +112,28 @@ import UIKit
     // MARK: - Authorization flow
 
     @objc public func requestAuthorization(_ completion: ((CLAuthorizationStatus, Error?) -> Void)?) {
+        updateDesiredPolicyFromConfig()
         requestAuthorizationForPolicy(desiredPolicy, completion: completion)
     }
 
     @objc public func requestAuthorizationForPolicy(_ policy: String, completion: ((CLAuthorizationStatus, Error?) -> Void)?) {
+        desiredPolicy = policy
+        authorizationStatus = locationManager?.authorizationStatus ?? CLLocationManager.authorizationStatus()
+
         guard enabled else {
             completion?(authorizationStatus, nil)
+            return
+        }
+
+        guard locationManager != nil else {
+            completion?(
+                authorizationStatus,
+                NSError(
+                    domain: "TSLocationAuthorization",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "CLLocationManager is not ready"]
+                )
+            )
             return
         }
 
@@ -147,25 +170,44 @@ import UIKit
         } else if shouldAttemptAlwaysUpgrade() {
             requestAlwaysUpgrade()
         } else if authorizationStatus == .denied || authorizationStatus == .restricted {
-            showSettingsAlert()
+            completeAuthorizationRequest(authorizationStatus, error: nil)
         } else {
             completeAuthorizationRequest(authorizationStatus, error: nil)
         }
     }
 
     @objc public func requestInitialAuthorization() {
-        guard let mgr = locationManager else { return }
+        guard let mgr = locationManager else {
+            completeAuthorizationRequest(
+                authorizationStatus,
+                error: NSError(
+                    domain: "TSLocationAuthorization",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "CLLocationManager is not ready"]
+                )
+            )
+            return
+        }
         DispatchQueue.main.async {
-            if self.desiredPolicy == "Always" {
-                mgr.requestAlwaysAuthorization()
-            } else {
-                mgr.requestWhenInUseAuthorization()
-            }
+            // iOS uses a two-stage flow for background location. The first
+            // system sheet grants foreground access; a later request upgrades
+            // that authorization to Always.
+            mgr.requestWhenInUseAuthorization()
         }
     }
 
     @objc public func requestAlwaysUpgrade() {
-        guard let mgr = locationManager else { return }
+        guard let mgr = locationManager else {
+            completeAuthorizationRequest(
+                authorizationStatus,
+                error: NSError(
+                    domain: "TSLocationAuthorization",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "CLLocationManager is not ready"]
+                )
+            )
+            return
+        }
         DispatchQueue.main.async {
             mgr.requestAlwaysAuthorization()
         }
@@ -289,7 +331,10 @@ import UIKit
     }
 
     @objc public func handleTimeout() {
-        completeAuthorizationRequest(authorizationStatus, error: NSError(domain: "TSLocationAuthorization", code: -2, userInfo: [NSLocalizedDescriptionKey: "Timeout"]))
+        // Complete with the CURRENT status and NO error. A slow user (or the
+        // deferred iOS Always prompt) must not produce a spurious rejection in
+        // JS — requestPermission inspects the returned status, not an error.
+        completeAuthorizationRequest(authorizationStatus, error: nil)
     }
 
     // MARK: - Handlers
@@ -319,7 +364,11 @@ import UIKit
     }
 
     @objc public func updateAuthorizationState() {
-        state = stateForAuthorizationStatus(authorizationStatus)
+        // Keep permission status separate from the request lifecycle in `state`.
+        // Mixing the two caused the initial `.notDetermined` callback to replace
+        // `idle`, so beginAuthorizationFlow() silently returned without showing
+        // the system permission sheet.
+        authorizationState = stateForAuthorizationStatus(authorizationStatus)
     }
 
     @objc public func checkAuthorizationStatusForPolicyChange() {
@@ -328,7 +377,14 @@ import UIKit
         case .authorizedAlways:
             handleAlwaysGranted()
         case .authorizedWhenInUse:
-            if desiredPolicy != "Always" { handleWhenInUseGranted() }
+            // iOS grants When-In-Use first even when Always was requested; the
+            // actual "Always" upgrade prompt is deferred to a later background
+            // transition, so NO further callback arrives this session. Resolve
+            // the request now with the real (provisional) status instead of
+            // hanging until the 20s timeout — which used to surface to JS as a
+            // rejection even though the user just granted access. The caller can
+            // re-request to trigger the Always upgrade.
+            handleWhenInUseGranted()
         case .denied, .restricted:
             handleAuthorizationDenied()
         default:

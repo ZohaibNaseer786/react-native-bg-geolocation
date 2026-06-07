@@ -1,10 +1,12 @@
 import Foundation
+import UIKit
 
 @objc public class TSHttpSyncMetrics: NSObject {
 
     @objc public var flushId: String = UUID().uuidString
     @objc public var lockedRecords: [[String: Any]] = []
     @objc public var lockedRecordsIsBatch: Bool = false
+    @objc public var currentBatchUuids: [String] = []
     @objc public var queuedBefore: Int = 0
     @objc public var pages: Int = 0
     @objc public var synced: Int = 0
@@ -45,21 +47,30 @@ import Foundation
 
     private let flushQueue = DispatchQueue(label: "TSHttpService.flush")
     private var watchdogTimer: Timer?
+    private var isMonitoring: Bool = false
 
     @objc public override init() {
         super.init()
     }
 
     @objc public func startMonitoring() {
+        guard !isMonitoring else {
+            resumePendingAutoSync()
+            return
+        }
+        isMonitoring = true
         reachability = TSReachability.reachability(forHostName: "google.com")
         reachability?.startMonitoring { [weak self] isReachable in
             self?.onConnectivityChange(isReachable)
         }
         registerConfigChangeHandlers()
+        resumePendingAutoSync()
     }
 
     @objc public func stopMonitoring() {
         reachability?.stopMonitoring()
+        reachability = nil
+        isMonitoring = false
     }
 
     @objc public func registerConfigChangeHandlers() {
@@ -82,21 +93,52 @@ import Foundation
         beginFlush(withCallback: success, overrideSyncThreshold: false, error: nil)
     }
 
+    /// Flush persisted locations during a brief Core Location background wake.
+    ///
+    /// The record is already durable in SQLite before this is called. Reserving
+    /// background execution here, before hopping onto flushQueue, gives the
+    /// request the best chance to finish when iOS has relaunched or resumed the
+    /// app for a location event. If the request cannot finish, the record stays
+    /// queued and resumePendingAutoSync retries it on the next native startup.
+    @objc public func flushForBackgroundWake() {
+        beginBackgroundFlushTask()
+        beginFlush(withCallback: nil, overrideSyncThreshold: true, error: nil)
+    }
+
+    @objc public func resumePendingAutoSync() {
+        let http = TSConfig.sharedInstance().http
+        guard http.autoSync, http.hasValidUrl else { return }
+        if TSAppState.sharedInstance().isInBackground ||
+            TSAppState.sharedInstance().didLaunchInBackground {
+            flushForBackgroundWake()
+        } else {
+            flush()
+        }
+    }
+
     @objc public func beginFlush(withCallback callback: (([String: Any]) -> Void)?, overrideSyncThreshold override: Bool, error: UnsafeMutablePointer<NSError?>?) {
         flushQueue.async { [weak self] in
             guard let self = self else { return }
             guard !self.isBusy else { return }
-            guard self.hasNetworkConnection else { return }
+            guard self.hasNetworkConnection else {
+                self.endBackgroundFlushTask()
+                return
+            }
 
             let dao = TSLocationDAO.sharedInstance()
             let records = dao.allWithLocking(true)
             guard !records.isEmpty else {
                 callback?([:])
+                self.endBackgroundFlushTask()
                 return
             }
 
+            self.autoSyncThreshold = TSConfig.sharedInstance().http.autoSyncThreshold
             let threshold = self.autoSyncThreshold
-            guard override || records.count >= threshold || threshold == 0 else { return }
+            guard override || records.count >= threshold || threshold == 0 else {
+                self.endBackgroundFlushTask()
+                return
+            }
 
             self.isBusy = true
             let m = TSHttpSyncMetrics()
@@ -137,6 +179,7 @@ import Foundation
         let maxBatch = config.effectiveBatchSize
         let slice = maxBatch > 0 ? Array(m.lockedRecords.prefix(maxBatch)) : m.lockedRecords
         m.lockedRecordsIsBatch = true
+        m.currentBatchUuids = slice.compactMap { $0["uuid"] as? String }
         postBatch(slice)
     }
 
@@ -178,11 +221,14 @@ import Foundation
     }
 
     @objc public func doPost(_ request: URLRequest, callback: @escaping ([String: Any]) -> Void) {
+        beginBackgroundFlushTask()
+        NSLog("[BGGEO] HTTP POST -> \(request.url?.absoluteString ?? "?")")
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             var result: [String: Any] = [:]
             if let httpResponse = response as? HTTPURLResponse {
                 result["status"] = httpResponse.statusCode
+                NSLog("[BGGEO] HTTP response status=\(httpResponse.statusCode)")
                 if let data = data {
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                         result["data"] = json
@@ -190,7 +236,10 @@ import Foundation
                     }
                 }
             }
-            if let error = error { result["error"] = error.localizedDescription }
+            if let error = error {
+                NSLog("[BGGEO] HTTP error: \(error.localizedDescription)")
+                result["error"] = error.localizedDescription
+            }
             callback(result)
         }.resume()
     }
@@ -199,12 +248,26 @@ import Foundation
         let status = response["status"] as? Int ?? 0
         guard let m = metrics else { return }
 
-        if status == 200 || status == 201 {
-            let uuids = m.lockedRecords.compactMap { $0["uuid"] as? String }
+        if (200...299).contains(status) {
             if m.lockedRecordsIsBatch {
-                _ = TSLocationDAO.sharedInstance().destroyAll(uuids)
-                m.synced += uuids.count
-                finish(response, error: nil)
+                // Destroy ONLY the records actually sent in this batch (the
+                // prefix slice), not the entire queue — otherwise records beyond
+                // maxBatchSize were deleted without ever being POSTed. Then loop
+                // to send the next batch until the queue is drained.
+                let sent = m.currentBatchUuids
+                _ = TSLocationDAO.sharedInstance().destroyAll(sent)
+                m.synced += sent.count
+                let sentSet = Set(sent)
+                m.lockedRecords.removeAll { rec in
+                    if let u = rec["uuid"] as? String { return sentSet.contains(u) }
+                    return false
+                }
+                m.currentBatchUuids = []
+                if m.lockedRecords.isEmpty {
+                    finish(response, error: nil)
+                } else {
+                    scheduleBatchPost()
+                }
             } else {
                 if let uuid = m.lockedRecords[m.pages]["uuid"] as? String {
                     _ = TSLocationDAO.sharedInstance().destroy(uuid)
@@ -244,7 +307,7 @@ import Foundation
         callback?()
         callback = nil
 
-        if let bgTask = (m != nil ? bgTask : .invalid) as UIBackgroundTaskIdentifier?, bgTask != .invalid {
+        if m != nil && bgTask != .invalid {
             stopWatchdog()
         }
     }
@@ -272,6 +335,7 @@ import Foundation
             self.watchdogTimer?.invalidate()
             self.watchdogTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { [weak self] _ in
                 self?.resetFlushStateLocked()
+                self?.endBackgroundFlushTask()
             }
         }
     }
@@ -279,6 +343,30 @@ import Foundation
     func stopWatchdog() {
         watchdogTimer?.invalidate()
         watchdogTimer = nil
+        endBackgroundFlushTask()
+    }
+
+    private func beginBackgroundFlushTask() {
+        let begin = {
+            guard self.bgTask == .invalid else { return }
+            self.bgTask = UIApplication.shared.beginBackgroundTask(withName: "TSHttpService.flush") { [weak self] in
+                self?.resetFlushStateLocked()
+                self?.endBackgroundFlushTask()
+            }
+        }
+        if Thread.isMainThread {
+            begin()
+        } else {
+            DispatchQueue.main.sync(execute: begin)
+        }
+    }
+
+    private func endBackgroundFlushTask() {
+        DispatchQueue.main.async {
+            guard self.bgTask != .invalid else { return }
+            UIApplication.shared.endBackgroundTask(self.bgTask)
+            self.bgTask = .invalid
+        }
     }
 
     // MARK: - Connectivity
@@ -308,6 +396,17 @@ import Foundation
             body[root] = record
         } else {
             body = record
+            // A common location endpoint accepts flat coordinate aliases. Keep
+            // the complete TSLocation payload while making the native request
+            // compatible with the same REST contract used by the JS fallback.
+            if let coords = record["coords"] as? [String: Any] {
+                let latitude = coords["latitude"]
+                let longitude = coords["longitude"]
+                body["lat"] = latitude
+                body["long"] = longitude
+                body["latitude"] = latitude
+                body["longitude"] = longitude
+            }
         }
         body.merge(config.params) { $1 }
         return buildHTTPRequest(url: config.fullUrlWithParams(), method: config.method, headers: config.headersWithAuth(auth), body: body)

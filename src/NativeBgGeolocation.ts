@@ -91,6 +91,10 @@ export interface Spec extends TurboModule {
     success: (status: number) => void,
     failure: (status: number) => void
   ): void;
+  requestMotionPermission(
+    success: (status: number) => void,
+    failure: (status: number) => void
+  ): void;
   requestTemporaryFullAccuracy(
     purpose: string,
     success: (accuracy: number) => void,

@@ -56,6 +56,7 @@ import UIKit
     private var stopDetectionDelayTimer: Timer?
     private var stopTimeoutTimer: Timer?
     private var motionTriggerTimer: Timer?
+    private var motionObserver: NSObjectProtocol?
     private var locationAccuracyQueue: [CLLocationAccuracy] = []
     private let stateQueue = DispatchQueue(label: "TSTrackingService.state", attributes: .concurrent)
     private let clMutationQueue = DispatchQueue(label: "TSTrackingService.cl")
@@ -73,27 +74,73 @@ import UIKit
         isEnabled = true
         self.isMoving = isMoving
         didReceiveFirstLocation = false
+        loadStationaryLocation()
 
         registerConfigChangeHandlers()
         registerEventBusHandlers()
 
         _mutateCL { mgr in
-            mgr.delegate = self
-            self.applyDistanceFilter(self.distanceFilter)
-            self.startUpdatingLocation()
+            // NOTE: the delegate is owned solely by TSCLRouter (see
+            // TSLocationManager.setupCoreLocation). Do NOT assign it here.
+            self.configureLocationManager(mgr)
+            self.startMonitoringSignificantLocationChanges()
+            if let stationary = self.stationaryLocation, !isMoving {
+                self.startMonitoringStationaryRegion(stationary, radius: TSConfig.sharedInstance().geolocation.stationaryRadius)
+            }
+            if TSConfig.sharedInstance().geolocation.useSignificantChangesOnly {
+                self.stopUpdatingLocation()
+            } else {
+                self.startUpdatingLocation()
+            }
             if isMoving {
                 self.beginStartDetection(isMoving)
             }
         }
+        startMotionMonitoring()
+        evaluateHeartbeatTimer()
     }
 
     @objc public func stop() {
         guard isEnabled else { return }
         isEnabled = false
         stopDetection()
+        stopMotionMonitoring()
         _mutateCL { mgr in
             self.stopUpdatingLocation()
+            self.stopMonitoringSignificantLocationChanges()
             self.stopMonitoringStationaryRegion()
+        }
+        stopHeartbeat()
+    }
+
+    // MARK: - Motion activity monitoring
+    //
+    // Drives autonomous stationary<->moving transitions from CMMotionActivity
+    // (the motion coprocessor). Previously TSMotionDetector was never started
+    // and its updates were observed by nobody, so the only way to detect motion
+    // onset was a coarse stationary-region exit. Now the detector runs while
+    // tracking is enabled and feeds onMotionActivityChange -> changePace.
+
+    @objc public func startMotionMonitoring() {
+        let detector = TSMotionDetector.sharedInstance()
+        detector.start()
+        if motionObserver == nil {
+            motionObserver = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("TSMotionDetectorDidUpdateActivity"),
+                object: nil, queue: .main
+            ) { [weak self] note in
+                if let activity = note.object as? TSMotionActivity {
+                    self?.onMotionActivityChange(activity)
+                }
+            }
+        }
+    }
+
+    @objc public func stopMotionMonitoring() {
+        TSMotionDetector.sharedInstance().stop()
+        if let obs = motionObserver {
+            NotificationCenter.default.removeObserver(obs)
+            motionObserver = nil
         }
     }
 
@@ -104,6 +151,21 @@ import UIKit
             guard let mgr = self.locationManager else { return }
             DispatchQueue.main.async { block(mgr) }
         }
+    }
+
+    @objc public func configureLocationManager(_ manager: CLLocationManager) {
+        let config = TSConfig.sharedInstance().geolocation
+        manager.desiredAccuracy = config.desiredAccuracy
+        manager.distanceFilter = config.distanceFilter
+        manager.activityType = config.activityType
+        manager.pausesLocationUpdatesAutomatically = config.pausesLocationUpdatesAutomatically
+        if #available(iOS 9.0, *) {
+            manager.allowsBackgroundLocationUpdates = TSAppState.sharedInstance().hasBackgroundLocationMode()
+        }
+        if #available(iOS 11.0, *) {
+            manager.showsBackgroundLocationIndicator = config.showsBackgroundLocationIndicator
+        }
+        distanceFilter = config.distanceFilter
     }
 
     // MARK: - Location updating
@@ -123,6 +185,24 @@ import UIKit
             mgr.stopUpdatingLocation()
             self.isUpdatingLocation = false
             self.stopUpdatingLocationAt = Date()
+        }
+    }
+
+    /// Re-assert tracking's intended continuous-updates state on the shared
+    /// CLLocationManager. Called by TSLocationRequestService after a
+    /// getCurrentPosition fix completes, so a one-off fix powering up GPS does
+    /// not leave it running (or off) against tracking's wishes.
+    @objc public func restoreUpdatingState() {
+        guard isEnabled else { return }
+        let geo = TSConfig.sharedInstance().geolocation
+        _mutateCL { mgr in
+            if geo.disableStopDetection || (self.isMoving && !geo.useSignificantChangesOnly) {
+                mgr.startUpdatingLocation()
+                self.isUpdatingLocation = true
+            } else {
+                mgr.stopUpdatingLocation()
+                self.isUpdatingLocation = false
+            }
         }
     }
 
@@ -153,7 +233,15 @@ import UIKit
     // MARK: - Stationary region
 
     @objc public func startMonitoringStationaryRegion(_ location: CLLocation, radius: CLLocationDistance) {
-        let region = CLCircularRegion(center: location.coordinate, radius: radius, identifier: "TSStationary")
+        // iOS CLCircularRegion monitoring is cell/wifi-coarse and unreliable
+        // below ~100-150m: a small radius either never fires the real exit or
+        // fires spurious exits from GPS jitter. The stationary region is the
+        // primary mechanism that wakes a suspended or system-terminated app when the user
+        // departs, so clamp it to a dependable minimum (decoupled from the
+        // motion stop/start `stationaryRadius` distance logic).
+        let minReliableRadius: CLLocationDistance = 200.0
+        let effectiveRadius = max(radius, minReliableRadius)
+        let region = CLCircularRegion(center: location.coordinate, radius: effectiveRadius, identifier: "TSStationary")
         region.notifyOnExit = true
         stationaryRegion = region
         _mutateCL { mgr in
@@ -191,6 +279,12 @@ import UIKit
     }
 
     private func setMoving(_ moving: Bool) {
+        // Continuous keep-alive ("ride app") mode: never relinquish the moving
+        // state, so GPS stays on and the app stays alive in the background with
+        // the location indicator. Ignore stationary transitions entirely.
+        if !moving && TSConfig.sharedInstance().geolocation.disableStopDetection {
+            return
+        }
         let wasMoving = isMoving
         isMoving = moving
 
@@ -318,7 +412,17 @@ import UIKit
     }
 
     @objc public func onHeartbeat() {
-        TSEventBus.sharedInstance().emit(TSEventNames.heartbeat, payload: ["location": lastLocation.map { ["timestamp": $0.timestamp.timeIntervalSince1970] } ?? [:]])
+        // Renew the keep-alive background task so the next interval can fire
+        // while briefly suspended (best-effort; true kill-state longevity comes
+        // from SLC/region wake, not from background tasks).
+        if TSConfig.sharedInstance().app.preventSuspend {
+            TSBackgroundTaskManager.sharedInstance().renewPreventSuspend()
+        }
+        // Emit the typed event the bridge/listener expects (a TSHeartbeatEvent,
+        // not a raw dictionary — the previous payload type never matched and so
+        // never reached JS onHeartbeat).
+        let event = TSHeartbeatEvent(location: lastLocation ?? lastGoodLocation)
+        TSEventBus.sharedInstance().emit(TSEventNames.heartbeat, payload: event)
     }
 
     @objc public func evaluateHeartbeatTimer() {
@@ -361,11 +465,22 @@ import UIKit
     }
 
     @objc public func persistLocation(_ location: TSLocation) {
+        var didPersist = false
         if let block = beforeInsertBlock {
             guard let modified = block(location) else { return }
-            _ = TSLocationDAO.sharedInstance().create(modified, error: nil)
+            didPersist = TSLocationDAO.sharedInstance().create(modified, error: nil)
         } else {
-            _ = TSLocationDAO.sharedInstance().create(location, error: nil)
+            didPersist = TSLocationDAO.sharedInstance().create(location, error: nil)
+        }
+
+        let httpConfig = TSConfig.sharedInstance().http
+        if didPersist && httpConfig.autoSync && httpConfig.hasValidUrl {
+            let http = TSHttpService.sharedInstance()
+            if isInBackground() || TSAppState.sharedInstance().didLaunchInBackground {
+                http.flushForBackgroundWake()
+            } else {
+                http.flush()
+            }
         }
     }
 
@@ -374,6 +489,14 @@ import UIKit
         _ = TSLocationDAO.sharedInstance().create(tsLocation, error: nil)
         stationaryLocation = location
         UserDefaults.standard.set(try? JSONSerialization.data(withJSONObject: tsLocation.toDictionary()), forKey: "TSLocationManager_stationary")
+        if TSConfig.sharedInstance().http.autoSync && TSConfig.sharedInstance().http.hasValidUrl {
+            let http = TSHttpService.sharedInstance()
+            if isInBackground() || TSAppState.sharedInstance().didLaunchInBackground {
+                http.flushForBackgroundWake()
+            } else {
+                http.flush()
+            }
+        }
     }
 
     @objc public func loadStationaryLocation() {
@@ -411,14 +534,29 @@ import UIKit
 
         if moving {
             stopMonitoringStationaryRegion()
-            beginHeartbeat()
+            startMonitoringSignificantLocationChanges()
+            startUpdatingLocation()
         } else {
-            stopHeartbeat()
+            // Going stationary: persist the stop, arm the wake mechanisms (SLC +
+            // stationary region), and CRITICALLY tear down the high-power
+            // continuous GPS stream — otherwise full-accuracy GPS runs forever
+            // while parked (the biggest iOS battery drain, and the exact thing
+            // the stationary state exists to prevent).
             if let loc = loc {
                 let config = TSConfig.sharedInstance()
+                persistStationaryLocation(loc)
                 startMonitoringStationaryRegion(loc, radius: config.geolocation.stationaryRadius)
             }
+            startMonitoringSignificantLocationChanges()
+            // Keep GPS running in continuous keep-alive mode; otherwise tear it
+            // down to save battery and rely on SLC/region wakeups.
+            if !TSConfig.sharedInstance().geolocation.disableStopDetection {
+                stopUpdatingLocation()
+            }
         }
+        // Heartbeat lifecycle is owned by evaluateHeartbeatTimer() for the whole
+        // enabled session, so it keeps firing across pace changes (including
+        // while stationary, which is when it matters most).
     }
 
     @objc public func onMotionChangeError(_ error: Error) {
@@ -531,9 +669,21 @@ import UIKit
 
     @objc public func onMotionActivityChange(_ activity: TSMotionActivity) {
         currentMotionActivity = activity
-        let moving = activity.type != "still"
+        // Surface the activitychange event to JS (nothing emitted this before,
+        // so BackgroundGeolocation.onActivityChange never fired).
+        TSEventBus.sharedInstance().emit(TSEventNames.activityChange, payload: activity)
+        // Drive pace from the detected activity. "still"/"unknown" => stationary;
+        // anything else (walking/running/in_vehicle/on_bicycle) => moving. Route
+        // through changePace so the pending-authorization path is honored.
+        let moving = activity.type != "still" && activity.type != "unknown"
+        TSLiveActivityManager.shared.update(
+            location: lastGoodLocation,
+            isMoving: moving,
+            activity: activity.type,
+            force: true
+        )
         if moving != isMoving {
-            setMoving(moving)
+            changePace(moving)
         }
     }
 
@@ -543,17 +693,58 @@ import UIKit
     }
 
     @objc public func onResume() {
-        if isEnabled { startUpdatingLocation() }
+        if isEnabled {
+            startMonitoringSignificantLocationChanges()
+            if !TSConfig.sharedInstance().geolocation.useSignificantChangesOnly {
+                startUpdatingLocation()
+            }
+        }
     }
 
     @objc public func onSuspend() {
-        if isEnabled && !isMoving {
-            stopUpdatingLocation()
+        guard isEnabled else { return }
+        let geo = TSConfig.sharedInstance().geolocation
+        startMonitoringSignificantLocationChanges()
+        // Continuous keep-alive mode: keep GPS running while backgrounded so the
+        // app is never suspended (this is what shows the status-bar indicator and
+        // is how ride apps stay alive). Otherwise downgrade to SLC + stationary
+        // region to save battery.
+        if geo.disableStopDetection || (isMoving && !geo.useSignificantChangesOnly) {
+            startUpdatingLocation()
+        } else {
             startMonitoringSignificantLocationChanges()
+            if let loc = stationaryLocation ?? lastGoodLocation {
+                startMonitoringStationaryRegion(loc, radius: geo.stationaryRadius)
+            }
+            stopUpdatingLocation()
         }
     }
 
     @objc public func onAppTerminate() {
+        let config = TSConfig.sharedInstance()
+        guard config.app.stopOnTerminate else {
+            config.enabled = true
+            config.isMoving = isMoving
+            config.forcePersistNow()
+            // UIApplication.willTerminate handlers MUST work synchronously — iOS
+            // kills the process shortly after this returns, so the async
+            // _mutateCL (clMutationQueue -> main) hop used elsewhere would be
+            // dropped. Re-arm the wake mechanisms directly on the manager here.
+            // (We are already on the main thread for this notification.)
+            if let mgr = locationManager {
+                configureLocationManager(mgr)
+                mgr.startMonitoringSignificantLocationChanges()
+                isMonitoringSignificantLocationChanges = true
+                if let loc = stationaryLocation ?? lastGoodLocation {
+                    let radius = max(config.geolocation.stationaryRadius, 200.0)
+                    let region = CLCircularRegion(center: loc.coordinate, radius: radius, identifier: "TSStationary")
+                    region.notifyOnExit = true
+                    stationaryRegion = region
+                    mgr.startMonitoring(for: region)
+                }
+            }
+            return
+        }
         stop()
     }
 
@@ -580,6 +771,8 @@ import UIKit
     @objc public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
 
+        NSLog("[BGGEO] didUpdateLocations: lat=\(location.coordinate.latitude) lng=\(location.coordinate.longitude) acc=\(location.horizontalAccuracy) background=\(isInBackground()) moving=\(isMoving)")
+
         let config = TSConfig.sharedInstance()
 
         locationAccuracyQueue.append(location.horizontalAccuracy)
@@ -592,6 +785,10 @@ import UIKit
             lastGoodLocation = location
             if !didReceiveFirstLocation {
                 didReceiveFirstLocation = true
+                if !isMoving {
+                    persistStationaryLocation(location)
+                    startMonitoringStationaryRegion(location, radius: config.geolocation.stationaryRadius)
+                }
             }
             bestLocation = location
         }
@@ -602,6 +799,23 @@ import UIKit
         }
 
         TSGeofenceManager.sharedInstance().setLocation(location, isMoving: isMoving)
+        // Give the motion classifier speed/location context so its
+        // walking/running/vehicle classification can use speed alongside the
+        // accelerometer / CMMotionActivity signal.
+        TSMotionDetector.sharedInstance().setLocation(location, isMoving: isMoving)
+
+        // Speed-based motion onset. CMMotionActivity is unreliable for vehicles
+        // and bikes — when the phone is held steady the classifier reports
+        // `unknown`/`stationary` even at speed, which kept isMoving=false on real
+        // rides. GPS speed is decisive here, so flip to moving when we see real
+        // ground speed regardless of the activity classifier. (Going back to
+        // stationary is still handled by stop-detection / activity, except in
+        // keep-alive mode where we intentionally never stop.)
+        let speedMovingThreshold: CLLocationDistance = 1.5 // m/s ≈ 5.4 km/h
+        if location.speed >= 0, location.speed > speedMovingThreshold, !isMoving {
+            NSLog("[BGGEO] speed-based motion onset: speed=\(location.speed) m/s -> moving")
+            detectStartMotion(location)
+        }
 
         let tsLocation = TSLocation(location: location, type: isMoving ? "tracking" : "stationary", extras: nil)
         tsLocation.isMoving = isMoving
@@ -610,6 +824,13 @@ import UIKit
         if config.shouldPersist(tsLocation) {
             persistLocation(tsLocation)
         }
+
+        TSLiveActivityManager.shared.update(
+            location: location,
+            isMoving: isMoving,
+            activity: currentMotionActivity?.type ?? (isMoving ? "moving" : "still"),
+            force: false
+        )
 
         // Deliver to RN module listeners (BgGeolocation.mm registered via onLocation:)
         TSEventManager.sharedInstance().triggerLocationSuccess(tsLocation)
@@ -629,7 +850,14 @@ import UIKit
     @objc public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
         guard region.identifier == "TSStationary" else { return }
         if !isMoving {
-            detectStartMotion(lastLocation ?? CLLocation())
+            startUpdatingLocation()
+            let fallback: CLLocation
+            if let circular = region as? CLCircularRegion {
+                fallback = CLLocation(latitude: circular.center.latitude, longitude: circular.center.longitude)
+            } else {
+                fallback = CLLocation()
+            }
+            detectStartMotion(lastLocation ?? lastGoodLocation ?? fallback)
         }
     }
 

@@ -30,7 +30,7 @@ import UIKit
     }
 
     private func setupCoreLocation() {
-        DispatchQueue.main.async {
+        let configure = {
             let mgr = CLLocationManager()
             self.locationManager = mgr
             TSLocationAuthorization.configureShared(withLocationManager: mgr)
@@ -38,6 +38,39 @@ import UIKit
             TSTrackingService.sharedInstance().locationManager = mgr
             TSGeofenceManager.sharedInstance().locationManager = mgr
             // TSScheduler does not hold a locationManager reference
+
+            // Configure the shared manager the instant it exists —
+            // allowsBackgroundLocationUpdates DEFAULTS TO false, and iOS refuses
+            // background delivery / pauses GPS without it. Doing this here (not
+            // only in start()) means the kill-state auto-resume path and any
+            // direct SLC/region arming get a correctly-configured manager.
+            TSTrackingService.sharedInstance().configureLocationManager(mgr)
+
+            // A CLLocationManager has exactly one delegate. Route every callback
+            // through TSCLRouter, which fans out to the services above. This MUST
+            // be the only place `mgr.delegate` is assigned.
+            mgr.delegate = TSCLRouter.sharedInstance()
+
+            // Kill-state / cold-boot auto-resume. On an iOS background relaunch
+            // (significant-change or region exit after system termination) JS may never
+            // call ready(), so the engine must re-arm monitoring itself or the OS
+            // wake is wasted and nothing is delivered. Only resume when tracking
+            // was persisted enabled (or startOnBoot fired) — i.e. the user had
+            // tracking on and didn't stop it. ready() is idempotent (guarded by
+            // isReady), so a later JS ready() is a no-op for start.
+            let cfg = TSConfig.sharedInstance()
+            let launchedInBackground = TSAppState.sharedInstance().didLaunchInBackground
+            NSLog("[BGGEO] setupCoreLocation auto-resume check: enabled=\(cfg.enabled) startOnBoot=\(cfg.app.startOnBoot) launchedInBackground=\(launchedInBackground)")
+            if cfg.enabled || (cfg.app.startOnBoot && launchedInBackground) {
+                NSLog("[BGGEO] auto-resuming engine natively (kill-state path)")
+                self.ready()
+            }
+        }
+
+        if Thread.isMainThread {
+            configure()
+        } else {
+            DispatchQueue.main.sync(execute: configure)
         }
     }
 
@@ -53,6 +86,8 @@ import UIKit
         TSHttpService.sharedInstance().startMonitoring()
         TSLocationDAO.sharedInstance()
 
+        let appState = TSAppState.sharedInstance()
+        config.didLaunchInBackground = appState.didLaunchInBackground
         if config.app.startOnBoot && config.didLaunchInBackground {
             doStart(true)
         }
@@ -61,13 +96,27 @@ import UIKit
             doStart(config.isMoving)
         }
 
+        // Drain records left by an interrupted background request immediately.
+        // This does not depend on React Native listeners or a later reachability
+        // transition, so a location-triggered cold launch can deliver natively.
+        TSHttpService.sharedInstance().resumePendingAutoSync()
+
+        // Clear the background-launch flag UNCONDITIONALLY once it has been read
+        // into config — otherwise (when ready() runs via the cfg.enabled branch
+        // instead of startOnBoot) the flag leaks into the NEXT normal foreground
+        // launch, corrupting launch classification.
+        UserDefaults.standard.removeObject(forKey: "TSLocationManager_didLaunchInBackground")
+
         TSAppState.sharedInstance().clientReady = true
     }
 
     @objc public func start() {
         let config = TSConfig.sharedInstance()
         config.enabled = true
-        config.persist()
+        // Start must be durable before returning to JS. If the process is
+        // terminated immediately after the user taps Start, an async archive
+        // can be lost and the next Core Location launch cannot auto-resume.
+        config.forcePersistNow()
         doStart(config.isMoving)
     }
 
@@ -78,6 +127,8 @@ import UIKit
         let tracking = TSTrackingService.sharedInstance()
         tracking.beforeInsertBlock = beforeInsertBlock
         tracking.start(isMoving)
+        TSLiveActivityManager.shared.startIfNeeded(isMoving: isMoving)
+        TSTrackingAudioManager.shared.startIfNeeded()
 
         if config.app.preventSuspend {
             TSBackgroundTaskManager.sharedInstance().startPreventSuspend(.invalid)
@@ -95,9 +146,11 @@ import UIKit
         let config = TSConfig.sharedInstance()
         config.enabled = false
         config.isMoving = false
-        config.persist()
+        config.forcePersistNow()
 
         TSTrackingService.sharedInstance().stop()
+        TSLiveActivityManager.shared.end()
+        TSTrackingAudioManager.shared.stop()
         TSBackgroundTaskManager.sharedInstance().stopPreventSuspend(.invalid)
         TSGeofenceManager.sharedInstance().stop()
         TSScheduler.sharedInstance().stop()
@@ -127,11 +180,29 @@ import UIKit
     // MARK: - Watch position
 
     @objc public func watchPosition(_ request: TSWatchPositionRequest) {
-        TSLocationRequestService.sharedInstance().startStream(TSStreamLocationRequest())
+        // Bridge the watch request onto a stream and drive its success block with
+        // a TSLocation on every emitted fix (previously the passed request was
+        // dropped and a blank stream with no callback was started instead).
+        let stream = TSStreamLocationRequest()
+        stream.interval = request.interval
+        stream.desiredAccuracy = request.desiredAccuracy
+        stream.persist = request.persist
+        stream.extras = request.extras
+        stream.success = { location in
+            guard let cl = location as? CLLocation else { return }
+            let tsLocation = TSLocation(location: cl, type: "watch", extras: request.extras as? [String: Any])
+            if request.persist {
+                _ = TSLocationDAO.sharedInstance().create(tsLocation, error: nil)
+            }
+            request.success?(tsLocation)
+        }
+        _ = TSLocationRequestService.sharedInstance().startStream(stream)
     }
 
     @objc public func stopWatchPosition(_ watchId: Int) {
-        TSLocationRequestService.sharedInstance().stopStream(watchId)
+        // The bridge supports a single active watch, so stop all streams rather
+        // than relying on a stream id the JS layer never receives.
+        TSLocationRequestService.sharedInstance().stopAllStreams()
     }
 
     // MARK: - Geofences
@@ -326,7 +397,10 @@ import UIKit
     }
 
     @objc public func getState() -> [String: Any] {
-        return TSConfig.sharedInstance().currentStateDictionary()
+        var state = TSConfig.sharedInstance().currentStateDictionary()
+        state["liveActivity"] = TSLiveActivityManager.shared.stateDictionary()
+        state["trackingAudio"] = TSTrackingAudioManager.shared.stateDictionary()
+        return state
     }
 
     // MARK: - Hardware availability
@@ -366,6 +440,7 @@ import UIKit
     // MARK: - Permissions
 
     @objc public func requestPermission(_ success: (() -> Void)?, failure: ((Error) -> Void)?) {
+        TSLocationAuthorization.sharedInstance().updateDesiredPolicyFromConfig()
         TSLocationAuthorization.sharedInstance().requestAuthorization { status, error in
             if let error = error {
                 failure?(error)

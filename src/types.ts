@@ -103,6 +103,7 @@ export interface GeolocationConfig {
   isMoving?: boolean;
   stopTimeout?: number;
   stopDetectionDelay?: number;
+  disableStopDetection?: boolean;
   disableMotionActivityUpdates?: boolean;
   locationAuthorizationRequest?: 'Always' | 'WhenInUse' | 'Any';
   geofenceProximityRadius?: number;
@@ -128,6 +129,22 @@ export interface AppConfig {
   heartbeatInterval?: number;
   preventSuspend?: boolean;
   foregroundService?: boolean;
+  /** iOS 16.2+: show tracking status on the Lock Screen and Dynamic Island. */
+  liveActivityEnabled?: boolean;
+  liveActivityTitle?: string;
+  liveActivitySubtitle?: string;
+  /** Minimum seconds between local ActivityKit updates. */
+  liveActivityUpdateInterval?: number;
+  /** Seconds before the displayed state is marked stale. */
+  liveActivityStaleSeconds?: number;
+  /** Request an ActivityKit APNs token for server-driven updates. */
+  liveActivityPushUpdates?: boolean;
+  /** iOS: start an audible audio session while tracking is enabled. */
+  trackingAudioEnabled?: boolean;
+  /** iOS tracking tone volume from 0.01 through 1.0. */
+  trackingAudioVolume?: number;
+  /** iOS: mix the tracking sound with other apps instead of interrupting them. */
+  trackingAudioMixWithOthers?: boolean;
   notification?: NotificationConfig;
   backgroundPermissionRationale?: {
     title?: string;
@@ -157,6 +174,33 @@ export interface PersistenceConfig {
   persistMode?: number;
 }
 
+export interface LiveActivityState {
+  supported: boolean;
+  enabled: boolean;
+  active: boolean;
+  activityId?: string;
+  /**
+   * ActivityKit APNs token. Send this to your server and use the
+   * `<bundle-id>.push-type.liveactivity` APNs topic for remote updates.
+   */
+  pushToken?: string;
+}
+
+export interface TrackingAudioState {
+  enabled: boolean;
+  requested: boolean;
+  active: boolean;
+  audible: boolean;
+  volume: number;
+  /** Audio playback has no iOS runtime permission prompt. */
+  permissionRequired?: false;
+  /** `notRequired` for playback-only audio. */
+  authorizationStatus?: 'notRequired';
+  backgroundModeDeclared?: boolean;
+  nowPlayingActive?: boolean;
+  error?: string;
+}
+
 /**
  * Config accepts EITHER the modern nested shape:
  *   { geolocation: {...}, app: {...}, logger: {...}, persistence: {...} }
@@ -177,6 +221,8 @@ export interface State extends Record<string, any> {
   schedulerEnabled: boolean;
   trackingMode: number;
   odometer: number;
+  liveActivity?: LiveActivityState;
+  trackingAudio?: TrackingAudioState;
 }
 
 export interface DeviceInfo {
@@ -195,4 +241,5 @@ export interface Sensors {
   gyroscope: boolean;
   magnetometer: boolean;
   motionHardware: boolean;
+  motionAuthorizationStatus?: number;
 }

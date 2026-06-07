@@ -36,7 +36,7 @@ import CoreLocation
         super.init()
         launchTimestamp = Date()
         isInBackground = UIApplication.shared.applicationState == .background
-        didLaunchInBackground = UIApplication.shared.applicationState == .background
+        didLaunchInBackground = isInBackground || UserDefaults.standard.bool(forKey: "TSLocationManager_didLaunchInBackground")
         setupNotifications()
     }
 
@@ -52,21 +52,29 @@ import CoreLocation
                                                name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(onEnterForeground),
                                                name: UIApplication.willEnterForegroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(onWillTerminate),
+                                               name: UIApplication.willTerminateNotification, object: nil)
     }
 
     @objc public func onDidBecomeActive() {
         isInBackground = false
         foregroundObserved = true
+        TSTrackingService.sharedInstance().onResume()
     }
 
     @objc public func onEnterBackground() {
         isInBackground = true
         startHeuristicTimerIfNeeded()
+        TSTrackingService.sharedInstance().onSuspend()
     }
 
     @objc public func onEnterForeground() {
         isInBackground = false
         cancelHeuristicTimer()
+    }
+
+    @objc public func onWillTerminate() {
+        TSTrackingService.sharedInstance().onAppTerminate()
     }
 
     @objc public func startHeuristicTimerIfNeeded() {

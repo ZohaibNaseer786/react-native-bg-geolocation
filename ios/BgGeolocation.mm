@@ -304,6 +304,16 @@ RCT_EXPORT_MODULE();
   }];
 }
 
+- (void)requestMotionPermission:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
+  CMMotionActivityManager *motionManager = [CMMotionActivityManager new];
+  [motionManager queryActivityStartingFromDate:[NSDate date]
+                                        toDate:[NSDate date]
+                                       toQueue:NSOperationQueue.mainQueue
+                                   withHandler:^(__unused NSArray<CMMotionActivity *> *activities, __unused NSError *error) {
+    success(@[@([CMMotionActivityManager authorizationStatus])]);
+  }];
+}
+
 - (void)requestTemporaryFullAccuracy:(NSString *)purpose success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   [_engine requestTemporaryFullAccuracy:purpose success:^{
     success(@[@(2)]);   // 2 = full accuracy
@@ -478,6 +488,7 @@ RCT_EXPORT_MODULE();
     @"gyroscope":      @([_engine isGyroAvailable]),
     @"magnetometer":   @([_engine isMagnetometerAvailable]),
     @"motionHardware": @([_engine isMotionHardwareAvailable]),
+    @"motionAuthorizationStatus": @([CMMotionActivityManager authorizationStatus]),
   }]);
 }
 
@@ -508,5 +519,65 @@ RCT_EXPORT_MODULE();
   return std::make_shared<facebook::react::NativeBgGeolocationSpecJSI>(params);
 }
 #endif
+
+@end
+
+// ─── Native kill-state / background launch bootstrap ─────────────────────────
+// A TurboModule is instantiated LAZILY — only when JS first touches it. On an
+// iOS location relaunch after system termination (significant-location-change
+// or stationary-region exit), the OS launches the app in the background and expects the queued Core
+// Location event to be delivered to a CLLocationManager that, at that instant,
+// does not exist yet. Waiting for the React Native bridge + JS bundle to boot
+// and import this module often loses the brief background wake window.
+//
+// This standalone class eagerly constructs the engine at class-load time and
+// also observes UIApplicationDidFinishLaunchingNotification — recreating the
+// CLLocationManager, installing the TSCLRouter delegate, and (via auto-resume)
+// re-arming SLC/region + native HTTP delivery — independently of React Native.
+// (It lives in its own class because BgGeolocation's +load is already provided
+// by the RCT_EXPORT_MODULE() macro, so a second +load there would collide.)
+@interface TSLaunchBootstrap : NSObject
+@end
+
+@implementation TSLaunchBootstrap
+
++ (void)bootstrapFromNotification:(NSNotification *)note phase:(NSString *)phase {
+    BOOL launchedForLocation =
+        note.userInfo[UIApplicationLaunchOptionsLocationKey] != nil;
+    BOOL inBackground =
+        [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
+    if (launchedForLocation || inBackground) {
+      [[NSUserDefaults standardUserDefaults] setBool:YES
+                                              forKey:@"TSLocationManager_didLaunchInBackground"];
+      [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+    // Diagnostic marker — visible in the iOS unified log (`log show` /
+    // `log collect`) even for a location-triggered kill-state relaunch with no JS.
+    NSLog(@"[BGGEO] %@Launching: launchedForLocation=%d inBackground=%d",
+          phase, launchedForLocation, inBackground);
+    // Bootstrap the engine now, before/independent of the RN bridge. The
+    // singleton's setupCoreLocation runs auto-resume when tracking was persisted
+    // enabled; on a normal foreground launch with tracking disabled this just
+    // creates + configures the (idle) manager, which is harmless.
+    TSLocationManager *manager = [TSLocationManager sharedInstance];
+    if (launchedForLocation || inBackground) {
+      [manager ready];
+    }
+}
+
++ (void)load {
+  // For a previously-enabled tracker, persisted config is enough to resume the
+  // engine before React Native or the application delegate has finished booting.
+  // CLLocationManager is created on the main thread by TSLocationManager.
+  (void)[TSLocationManager sharedInstance];
+
+  NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+  [center addObserverForName:UIApplicationDidFinishLaunchingNotification
+                      object:nil
+                       queue:[NSOperationQueue mainQueue]
+                  usingBlock:^(NSNotification *note) {
+    [self bootstrapFromNotification:note phase:@"didFinish"];
+  }];
+}
 
 @end

@@ -789,6 +789,16 @@ class BgGeolocationModule(reactContext: ReactApplicationContext) :
     if (hasLocationPermission()) success.invoke(3) else failure.invoke(2)
   }
 
+  override fun requestMotionPermission(success: Callback, failure: Callback) {
+    val granted =
+      Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+        ContextCompat.checkSelfPermission(
+          reactApplicationContext,
+          Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+    if (granted) success.invoke(3) else failure.invoke(2)
+  }
+
   override fun requestTemporaryFullAccuracy(purpose: String, success: Callback, failure: Callback) {
     success.invoke(0)
   }
@@ -947,6 +957,15 @@ class BgGeolocationModule(reactContext: ReactApplicationContext) :
       putBoolean("gyroscope",     has(android.hardware.Sensor.TYPE_GYROSCOPE))
       putBoolean("magnetometer",  has(android.hardware.Sensor.TYPE_MAGNETIC_FIELD))
       putBoolean("motionHardware",has(android.hardware.Sensor.TYPE_STEP_DETECTOR))
+      putInt(
+        "motionAuthorizationStatus",
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+          ContextCompat.checkSelfPermission(
+            reactApplicationContext,
+            Manifest.permission.ACTIVITY_RECOGNITION
+          ) == PackageManager.PERMISSION_GRANTED
+        ) 3 else 2
+      )
     })
   }
 

@@ -33,6 +33,22 @@ const JS_DEBUG_MARKER = 'ios-debug-marker-2026-06-05-2145';
 type PermStatus = 'unknown' | 'whenInUse' | 'always' | 'denied';
 type MotionState = 'unknown' | 'moving' | 'stationary';
 type SocketState = 'disconnected' | 'connecting' | 'connected';
+type NativeSessionState = 'inactive' | 'active' | 'error';
+
+function confirmIosTrackingAudio(): Promise<boolean> {
+  if (Platform.OS !== 'ios') return Promise.resolve(true);
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Allow tracking audio',
+      'Tracking uses audible playback while the session is active. iOS does not provide a system permission popup for playback audio.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Continue', onPress: () => resolve(true) },
+      ],
+      { cancelable: false }
+    );
+  });
+}
 
 // ─── Toast ──────────────────────────────────────────────────────────────────
 let _showIosToast: ((msg: string) => void) | null = null;
@@ -148,6 +164,9 @@ export default function App() {
   const [motionState, setMotion] = useState<MotionState>('unknown');
   const [activity, setActivity] = useState('—');
   const [socketState, setSocket] = useState<SocketState>('disconnected');
+  const [audioState, setAudioState] = useState<NativeSessionState>('inactive');
+  const [liveActivityState, setLiveActivityState] =
+    useState<NativeSessionState>('inactive');
   const [appStateLabel, setAppStateLabel] = useState<AppStateStatus>(
     (AppState.currentState ?? 'active') as AppStateStatus
   );
@@ -157,6 +176,24 @@ export default function App() {
     lng: number;
     t: string;
   } | null>(null);
+
+  const refreshNativeSessionState = async () => {
+    if (Platform.OS !== 'ios') return;
+    try {
+      const state = await BackgroundGeolocation.getState();
+      setEnabled(state.enabled);
+      setAudioState(
+        state.trackingAudio?.error
+          ? 'error'
+          : state.trackingAudio?.active
+            ? 'active'
+            : 'inactive'
+      );
+      setLiveActivityState(state.liveActivity?.active ? 'active' : 'inactive');
+    } catch {
+      setAudioState('error');
+    }
+  };
 
   useEffect(() => {
     // Wire the service's hooks to UI state
@@ -180,12 +217,21 @@ export default function App() {
         if (act) setActivity(act);
         showToast(moving ? '🚶 Moving' : '🧍 Stationary');
       },
-      onEnabledChange: setEnabled,
+      onEnabledChange: (value) => {
+        setEnabled(value);
+        refreshNativeSessionState().catch(() => {});
+      },
       onSocketStatus: setSocket,
     });
 
-    const sub = AppState.addEventListener('change', setAppStateLabel);
+    const sub = AppState.addEventListener('change', (nextState) => {
+      setAppStateLabel(nextState);
+      if (nextState === 'active') {
+        refreshNativeSessionState().catch(() => {});
+      }
+    });
     checkPermission();
+    refreshNativeSessionState().catch(() => {});
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -220,6 +266,8 @@ export default function App() {
     if (enabled) {
       await stopBackgroundTracking();
       setEnabled(false);
+      setAudioState('inactive');
+      setLiveActivityState('inactive');
       showToast('⏹ Tracking stopped');
       return;
     }
@@ -227,22 +275,45 @@ export default function App() {
     if (Platform.OS === 'android') {
       await requestAndroidPermissions();
       await checkPermission();
+    } else if (!(await confirmIosTrackingAudio())) {
+      showToast('Tracking was not started');
+      return;
     }
     const result = await startBackgroundTracking();
     if (Platform.OS === 'ios')
       setPermStatus(iosStatusLabel(result.permissionStatus));
     if (result.started) {
       setEnabled(true);
-      showToast('▶ Tracking started — socket delivery');
+      await refreshNativeSessionState();
+      showToast('▶ Tracking session started');
     } else {
-      showToast('⚠️ "Always" permission required');
+      const isMotionBlocked = result.blockedReason === 'motion';
+      const isAudioBlocked = result.blockedReason === 'audio';
+      showToast(
+        isAudioBlocked
+          ? 'Tracking audio could not start'
+          : isMotionBlocked
+            ? '⚠️ Motion permission required'
+            : '⚠️ "Always" permission required'
+      );
       Alert.alert(
-        'Permission needed',
-        'Enable "Always" location in Settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ]
+        isAudioBlocked
+          ? 'Tracking audio unavailable'
+          : isMotionBlocked
+            ? 'Motion permission needed'
+            : 'Location permission needed',
+        isAudioBlocked
+          ? (result.audioError ??
+              'The iOS audio session could not be activated. Tracking has been stopped.')
+          : isMotionBlocked
+            ? 'Enable Motion & Fitness permission in Settings before starting tracking.'
+            : 'Enable "Always" location in Settings before starting tracking.',
+        isAudioBlocked
+          ? [{ text: 'OK' }]
+          : [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
       );
     }
   };
@@ -292,6 +363,11 @@ export default function App() {
     connecting: '#f59e0b',
     disconnected: '#f87171',
   };
+  const nativeStateColor: Record<NativeSessionState, string> = {
+    active: '#4ade80',
+    inactive: '#94a3b8',
+    error: '#f87171',
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -300,7 +376,7 @@ export default function App() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>BG Geolocation</Text>
-          <Text style={styles.subtitle}>socket-only · app-level</Text>
+          <Text style={styles.subtitle}>native tracking session</Text>
         </View>
         <View
           style={[
@@ -324,6 +400,20 @@ export default function App() {
         />
         <Cell label="Motion" color={motColor[motionState]} text={motionState} />
         <Cell label="Activity" text={activity} />
+        {Platform.OS === 'ios' ? (
+          <Cell
+            label="Tracking audio"
+            color={nativeStateColor[audioState]}
+            text={audioState}
+          />
+        ) : null}
+        {Platform.OS === 'ios' ? (
+          <Cell
+            label="Live Activity"
+            color={nativeStateColor[liveActivityState]}
+            text={liveActivityState}
+          />
+        ) : null}
         <Cell label="App state" text={appStateLabel} />
         <Cell
           label="Last fix"

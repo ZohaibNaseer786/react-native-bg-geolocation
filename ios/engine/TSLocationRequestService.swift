@@ -41,7 +41,8 @@ import CoreLocation
 
     @objc public class func configureShared(withLocationManager manager: CLLocationManager) {
         sharedInstance().manager = manager
-        manager.delegate = sharedInstance()
+        // The CLLocationManager delegate is owned by TSCLRouter, which forwards
+        // location callbacks here. Do NOT assign manager.delegate.
     }
 
     // MARK: - State
@@ -72,6 +73,12 @@ import CoreLocation
     private var sampleListeners: [String: [Int: (CLLocation) -> Void]] = [:]
     private var listenerToken = 0
 
+    // Active getCurrentPosition requests, keyed by requestId. The request's own
+    // success/failure blocks are driven directly from didUpdateLocations / the
+    // timeout — these are the blocks the ObjC bridge passed down.
+    private var positionRequests: [String: TSCurrentPositionRequest] = [:]
+    private var positionSamples: [String: [CLLocation]] = [:]
+
     @objc public override init() {
         super.init()
         lockQueue = DispatchQueue(label: "TSLocationRequestService.lock")
@@ -86,7 +93,7 @@ import CoreLocation
     }
 
     @objc public func isActive() -> Bool {
-        return session?.active == true || !streams.isEmpty
+        return session?.active == true || !streams.isEmpty || !positionRequests.isEmpty
     }
 
     @objc public func hasActiveStreams() -> Bool {
@@ -144,15 +151,52 @@ import CoreLocation
 
     @objc public func requestLocation(_ request: TSCurrentPositionRequest) {
         lockQueue?.async {
-            if self.session == nil {
-                self.session = TSSamplingSession()
+            // Serve immediately from a fresh-enough cached fix when allowed.
+            if request.maximumAge > 0, let cached = self.lastLocation {
+                let age = -cached.timestamp.timeIntervalSinceNow
+                let accuracyOK = request.desiredAccuracy <= 0 || cached.horizontalAccuracy <= request.desiredAccuracy
+                if age <= (request.maximumAge / 1000.0) && accuracyOK {
+                    self.deliverPositionLocked(request, location: cached)
+                    return
+                }
             }
-            guard let session = self.session else { return }
-            session.active = true
-            session.startedAt = Date()
+            self.positionRequests[request.requestId] = request
+            self.positionSamples[request.requestId] = []
             self.startUpdatingLocked()
             self.scheduleTimeoutLocked(forRequest: request)
         }
+    }
+
+    /// Build a TSLocation, optionally persist, and fire the request's success
+    /// block on the callback queue. Caller must hold the lockQueue.
+    private func deliverPositionLocked(_ request: TSCurrentPositionRequest, location: CLLocation) {
+        let tsLocation = TSLocation(location: location, type: "current", extras: request.extras as? [String: Any])
+        if request.persist {
+            _ = TSLocationDAO.sharedInstance().create(tsLocation, error: nil)
+        }
+        let success = request.success
+        callbackQueue?.async { success?(tsLocation) }
+    }
+
+    /// Resolve an in-flight position request with its best sample. lockQueue.
+    private func finishPositionRequestLocked(_ requestId: String, location: CLLocation) {
+        guard let request = positionRequests[requestId] else { return }
+        clearTimeoutLockedForRequest(requestId)
+        positionRequests.removeValue(forKey: requestId)
+        positionSamples.removeValue(forKey: requestId)
+        deliverPositionLocked(request, location: location)
+        maybeStopUpdatesLocked()
+    }
+
+    /// Fail an in-flight position request with a CLError-style code. lockQueue.
+    private func failPositionRequestLocked(_ requestId: String, code: Int) {
+        guard let request = positionRequests[requestId] else { return }
+        clearTimeoutLockedForRequest(requestId)
+        positionRequests.removeValue(forKey: requestId)
+        positionSamples.removeValue(forKey: requestId)
+        let failure = request.failure
+        callbackQueue?.async { failure?(code) }
+        maybeStopUpdatesLocked()
     }
 
     @objc public func startStream(_ request: TSStreamLocationRequest) -> Int {
@@ -224,7 +268,14 @@ import CoreLocation
     }
 
     @objc public func maybeStopUpdatesLocked() {
-        if !isActive() {
+        guard !isActive() else { return }
+        // The CLLocationManager is shared with TSTrackingService. If tracking is
+        // running, hand control back to it rather than blindly stopping updates
+        // (which would silently break active background tracking).
+        let tracking = TSTrackingService.sharedInstance()
+        if tracking.isEnabled {
+            tracking.restoreUpdatingState()
+        } else {
             stopUpdatingLocked()
         }
     }
@@ -249,18 +300,26 @@ import CoreLocation
         let id = request.requestId
         DispatchQueue.main.async {
             let timer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
-                self?.clearTimeoutLockedForRequest(id)
-                let error = NSError(domain: "TSLocationRequestService", code: 408, userInfo: [NSLocalizedDescriptionKey: "Location request timed out"])
-                self?.emitError(error, forRequest: id)
-                self?.maybeEndSessionLocked()
+                self?.lockQueue?.async {
+                    guard let self = self else { return }
+                    // On timeout, return the best sample collected so far; only
+                    // fail (code 408) if nothing arrived at all.
+                    if let best = (self.positionSamples[id] ?? []).min(by: { $0.horizontalAccuracy < $1.horizontalAccuracy }) {
+                        self.finishPositionRequestLocked(id, location: best)
+                    } else {
+                        self.failPositionRequestLocked(id, code: 408)
+                    }
+                }
             }
-            self.timeoutTimers[id] = timer
+            // Keep all timeoutTimers mutations on lockQueue (clear runs there too).
+            self.lockQueue?.async { self.timeoutTimers[id] = timer }
         }
     }
 
     @objc public func clearTimeoutLockedForRequest(_ requestId: String) {
-        timeoutTimers[requestId]?.invalidate()
-        timeoutTimers.removeValue(forKey: requestId)
+        if let timer = timeoutTimers.removeValue(forKey: requestId) {
+            DispatchQueue.main.async { timer.invalidate() }
+        }
     }
 
     func cancelAllTimeouts() {
@@ -345,16 +404,30 @@ import CoreLocation
         guard let location = locations.last else { return }
         lastLocation = location
         lockQueue?.async {
-            self.trySatisfyRequestsLockedWith(location)
-            for (streamId, state) in self.streams {
+            // getCurrentPosition: collect samples; resolve once a fix is accurate
+            // enough or the requested sample count is reached. Iterate a snapshot
+            // because finishPositionRequestLocked mutates positionRequests.
+            for (id, request) in Array(self.positionRequests) {
+                self.positionSamples[id, default: []].append(location)
+                let samples = self.positionSamples[id] ?? [location]
+                let best = samples.min(by: { $0.horizontalAccuracy < $1.horizontalAccuracy }) ?? location
+                let accuracyOK = request.desiredAccuracy <= 0 || best.horizontalAccuracy <= request.desiredAccuracy
+                if accuracyOK || samples.count >= max(1, request.samples) {
+                    self.finishPositionRequestLocked(id, location: best)
+                }
+            }
+
+            // watchPosition streams: drive each stream's success block, throttled
+            // by its minInterval.
+            for (_, state) in self.streams {
                 let now = Date()
                 if let lastEmit = state.lastEmitAt {
                     guard now.timeIntervalSince(lastEmit) >= state.minInterval else { continue }
                 }
                 state.lastEmitAt = now
                 state.lastEmitted = location
-                let requestId = "stream_\(streamId)"
-                self.emitComplete(location, forRequest: requestId)
+                let success = state.request?.success
+                self.callbackQueue?.async { success?(location) }
             }
         }
     }
