@@ -64,7 +64,7 @@ extension_target.build_configurations.each do |configuration|
     "@executable_path/../../Frameworks"
   ]
   settings["MARKETING_VERSION"] = "1.0"
-  settings["PRODUCT_BUNDLE_IDENTIFIER"] = "bggeolocation.example.ios.LiveActivity"
+  settings["PRODUCT_BUNDLE_IDENTIFIER"] = "com.masjidpilot.staging.LiveActivity"
   settings["PRODUCT_NAME"] = "$(TARGET_NAME)"
   settings["SKIP_INSTALL"] = "YES"
   settings["SUPPORTED_PLATFORMS"] = "iphoneos iphonesimulator"

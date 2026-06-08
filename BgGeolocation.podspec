@@ -15,7 +15,12 @@ Pod::Spec.new do |s|
 
   # ObjC++ TurboModule wrapper + all Swift engine files.
   # No binary dependency — the engine is compiled from Swift source directly.
-  s.source_files = "ios/**/*.{h,m,mm,cpp}", "ios/engine/**/*.swift", "ios/liveactivity/**/*.swift"
+  # The location-push extension's principal class (TSLocationPushService.swift)
+  # is intentionally EXCLUDED from the pod — it belongs only to the
+  # CLLocationPushServiceExtension target. Only the shared constants
+  # (TSLocationPushShared.swift) are compiled into the engine so it can write
+  # config into the App Group.
+  s.source_files = "ios/**/*.{h,m,mm,cpp}", "ios/engine/**/*.swift", "ios/liveactivity/**/*.swift", "ios/locationpush/TSLocationPushShared.swift"
 
   s.libraries    = 'sqlite3', 'z', 'stdc++'
   s.frameworks   = "CoreLocation", "CoreMotion", "AVFoundation", "AudioToolbox", "MediaPlayer", "UIKit", "CoreData",

@@ -502,6 +502,12 @@ RCT_EXPORT_MODULE();
   }]);
 }
 
+- (void)getLocationPushToken:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
+  NSString *token = [[NSUserDefaults standardUserDefaults]
+                     stringForKey:@"TSLocationManager_locationPushToken"];
+  success(@[token ?: [NSNull null]]);
+}
+
 - (void)playSound:(double)soundId {
   [_engine playSound:(SystemSoundID)soundId];
 }

@@ -179,6 +179,11 @@ function getConfig(): Config {
             trackingAudioEnabled: true,
             trackingAudioVolume: 0.04,
             trackingAudioMixWithOthers: true,
+            // Kill-state tracking: server sends an APNs background push to the
+            // device's location-push token → iOS wakes the Location Push Service
+            // Extension → it captures one location and POSTs it to `url`. Needs
+            // the Apple-approved com.apple.developer.location.push entitlement.
+            locationPushEnabled: true,
           }
         : {}),
       foregroundService: true,
@@ -264,8 +269,61 @@ async function ensureReady(): Promise<State> {
   if (!readyPromise) {
     registerListeners();
     readyPromise = BackgroundGeolocation.ready(getConfig());
+    readyPromise.then(() => {
+      // Fire-and-forget: ship the iOS location-push token to the server so it
+      // can trigger kill-state location fetches via the Location Push Service
+      // Extension. No-op on Android (resolves null).
+      void registerLocationPushToken();
+    });
   }
   return readyPromise;
+}
+
+/**
+ * iOS only. Fetches the device's location-push APNs token and registers it with
+ * the server. The token may not be ready on the very first launch (iOS returns
+ * it asynchronously after `startMonitoringLocationPushes`); we retry briefly.
+ *
+ * Once the server has the token it can POST to Apple's APNs
+ * (apns-topic: <bundle-id>.location-push, apns-push-type: background) to wake
+ * the extension and have it upload a fresh location — even when the app is
+ * force-quit.
+ */
+export async function registerLocationPushToken(): Promise<string | null> {
+  if (Platform.OS !== 'ios') return null;
+
+  let token: string | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    token = await BackgroundGeolocation.getLocationPushToken().catch(() => null);
+    if (token) break;
+    await sleep(1500);
+  }
+
+  if (!token) {
+    log('⚠️ location-push token not available yet (entitlement pending?)');
+    return null;
+  }
+
+  log(`🔑 location-push token: ${token.slice(0, 12)}…`);
+  try {
+    const res = await fetch(`${SERVER_BASE_URL}/location-push/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${AUTH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        token,
+        platform: 'ios',
+        // apns-topic the server must use when pushing to this token.
+        topic: 'com.masjidpilot.staging.location-push',
+      }),
+    });
+    log(`location-push token register → HTTP ${res.status}`);
+  } catch (err) {
+    log(`❌ failed to register location-push token: ${String(err)}`);
+  }
+  return token;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

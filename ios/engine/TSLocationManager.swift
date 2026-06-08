@@ -107,7 +107,40 @@ import UIKit
         // launch, corrupting launch classification.
         UserDefaults.standard.removeObject(forKey: "TSLocationManager_didLaunchInBackground")
 
+        // Mirror the HTTP config into the App Group so the Location Push Service
+        // Extension can POST locations to the same server while the app is killed.
+        syncConfigToAppGroup()
+
         TSAppState.sharedInstance().clientReady = true
+    }
+
+    /// Writes the current HTTP config (url, headers, params, auth token, etc.)
+    /// into the App Group shared UserDefaults. The CLLocationPushServiceExtension
+    /// runs in a separate process and reads this to know where/how to upload the
+    /// location it captures after an APNs location push. Safe no-op if the App
+    /// Group entitlement is not configured.
+    @objc public func syncConfigToAppGroup() {
+        guard let defaults = TSLocationPushShared.sharedDefaults() else {
+            NSLog("[BGGEO] App Group not configured — Location Push config not synced")
+            return
+        }
+        let config = TSConfig.sharedInstance()
+        let http = config.http
+
+        defaults.set(http.url, forKey: TSLocationPushShared.keyUrl)
+        defaults.set(http.method, forKey: TSLocationPushShared.keyMethod)
+        defaults.set(http.headers, forKey: TSLocationPushShared.keyHeaders)
+        defaults.set(http.params, forKey: TSLocationPushShared.keyParams)
+        defaults.set(http.rootProperty, forKey: TSLocationPushShared.keyRootProperty)
+
+        let auth = config.authorization
+        if let token = auth.accessToken, !token.isEmpty {
+            defaults.set(token, forKey: TSLocationPushShared.keyAccessToken)
+        } else {
+            defaults.removeObject(forKey: TSLocationPushShared.keyAccessToken)
+        }
+
+        NSLog("[BGGEO] Synced HTTP config to App Group (url=\(http.url)) for Location Push Extension")
     }
 
     @objc public func start() {
@@ -117,6 +150,7 @@ import UIKit
         // terminated immediately after the user taps Start, an async archive
         // can be lost and the next Core Location launch cannot auto-resume.
         config.forcePersistNow()
+        syncConfigToAppGroup()
         doStart(config.isMoving)
     }
 

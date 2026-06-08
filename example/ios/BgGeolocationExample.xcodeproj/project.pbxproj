@@ -11,15 +11,20 @@
 		0C80B921A6F3F58F76C31292 /* libPods-BgGeolocationExample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-BgGeolocationExample.a */; };
 		106C48778FE525F374656CDC /* BgGeolocationLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0142A05B67DB0B3296B1A4E8 /* BgGeolocationLiveActivityBundle.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		231714B6D3E532687649BB4C /* TSLocationPushShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1636814E71EE6D88A84F92 /* TSLocationPushShared.swift */; };
 		2FF5CC921A7CAEB7BCDBE3C1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		5216D1256547033ED466282D /* BgGeolocationLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 4CD38FDE231CD536FB26B405 /* BgGeolocationLiveActivity.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		54B04F3220BB74BA05A020D0 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6823C23AE7DF090504249C57 /* CoreLocation.framework */; };
 		5F9698A714EBFBAFA7B05905 /* TSLiveTrackingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE70CBD8E7661E64E29A2D71 /* TSLiveTrackingAttributes.swift */; };
 		70B24AC734266267586537B0 /* LiveTrackingWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA47E4B4DF89311EA7114BBF /* LiveTrackingWidget.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		776E4DE5A8FF97F08A1A6C82 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EEA1CF95CC3910EEDBBE8455 /* SwiftUI.framework */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		89585FE00F2B1496681DDAA0 /* TSLocationPushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A158860F496EA8A0F256088 /* TSLocationPushService.swift */; };
+		896FB9DC7AB61AB92D361AB9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CCA0C942291F5B575D339E24 /* Foundation.framework */; };
 		9D9E1B92A5043875569B487B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CCA0C942291F5B575D339E24 /* Foundation.framework */; };
 		D09C9BAA8F555FA90FD6D812 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C7948DB36C89FFC42DAD68C /* WidgetKit.framework */; };
+		DB7ADD5637706F43D74373CE /* LocationPushExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BF0887F37AB8EA5AE58EB131 /* LocationPushExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,6 +34,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 676634CB482D3FCAB46DF1D2;
 			remoteInfo = BgGeolocationLiveActivity;
+		};
+		F15ECF46BB1B23EB03A38824 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3DF28F22F149234D2415DC57;
+			remoteInfo = LocationPushExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -40,6 +52,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				5216D1256547033ED466282D /* BgGeolocationLiveActivity.appex in Embed App Extensions */,
+				DB7ADD5637706F43D74373CE /* LocationPushExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -57,12 +70,18 @@
 		5709B34CF0A7D63546082F79 /* Pods-BgGeolocationExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BgGeolocationExample.release.xcconfig"; path = "Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample.release.xcconfig"; sourceTree = "<group>"; };
 		5C7948DB36C89FFC42DAD68C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-BgGeolocationExample.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BgGeolocationExample.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6823C23AE7DF090504249C57 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BgGeolocationExample/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BgGeolocationExample/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8A158860F496EA8A0F256088 /* TSLocationPushService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLocationPushService.swift; sourceTree = "<group>"; };
 		BA47E4B4DF89311EA7114BBF /* LiveTrackingWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveTrackingWidget.swift; sourceTree = "<group>"; };
 		BE70CBD8E7661E64E29A2D71 /* TSLiveTrackingAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLiveTrackingAttributes.swift; sourceTree = "<group>"; };
+		BF0887F37AB8EA5AE58EB131 /* LocationPushExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LocationPushExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCA0C942291F5B575D339E24 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		D6696176D6B52CBA5EE1FF06 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E40DA366EFEDD367D3DC2C96 /* LocationPushExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = LocationPushExtension.entitlements; sourceTree = "<group>"; };
 		E88D391513ED32AA26DEAB1C /* ActivityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ActivityKit.framework; path = System/Library/Frameworks/ActivityKit.framework; sourceTree = SDKROOT; };
+		EB1636814E71EE6D88A84F92 /* TSLocationPushShared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLocationPushShared.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		EEA1CF95CC3910EEDBBE8455 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -73,6 +92,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-BgGeolocationExample.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC34A52A08EC7E6CADFCB29C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				896FB9DC7AB61AB92D361AB9 /* Foundation.framework in Frameworks */,
+				54B04F3220BB74BA05A020D0 /* CoreLocation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +118,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0F21CE1F685D938E969847E4 /* LocationPushShared */ = {
+			isa = PBXGroup;
+			children = (
+				EB1636814E71EE6D88A84F92 /* TSLocationPushShared.swift */,
+				8A158860F496EA8A0F256088 /* TSLocationPushService.swift */,
+			);
+			name = LocationPushShared;
+			path = ../../ios/locationpush;
+			sourceTree = SOURCE_ROOT;
+		};
 		13B07FAE1A68108700A75B9A /* BgGeolocationExample */ = {
 			isa = PBXGroup;
 			children = (
@@ -108,7 +146,6 @@
 				0142A05B67DB0B3296B1A4E8 /* BgGeolocationLiveActivityBundle.swift */,
 				BA47E4B4DF89311EA7114BBF /* LiveTrackingWidget.swift */,
 			);
-			name = BgGeolocationLiveActivity;
 			path = BgGeolocationLiveActivity;
 			sourceTree = "<group>";
 		};
@@ -121,6 +158,7 @@
 				E88D391513ED32AA26DEAB1C /* ActivityKit.framework */,
 				EEA1CF95CC3910EEDBBE8455 /* SwiftUI.framework */,
 				5C7948DB36C89FFC42DAD68C /* WidgetKit.framework */,
+				6823C23AE7DF090504249C57 /* CoreLocation.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -151,6 +189,8 @@
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
 				29BF92BD7679AD80C7470A85 /* BgGeolocationLiveActivity */,
 				7225EEBDDC72B96D06D6B07C /* LiveActivityShared */,
+				0F21CE1F685D938E969847E4 /* LocationPushShared */,
+				DB3B24A1D45E18C584CDA8CB /* LocationPushExtension */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -162,6 +202,7 @@
 			children = (
 				13B07F961A680F5B00A75B9A /* BgGeolocationExample.app */,
 				4CD38FDE231CD536FB26B405 /* BgGeolocationLiveActivity.appex */,
+				BF0887F37AB8EA5AE58EB131 /* LocationPushExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -173,6 +214,15 @@
 				5709B34CF0A7D63546082F79 /* Pods-BgGeolocationExample.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		DB3B24A1D45E18C584CDA8CB /* LocationPushExtension */ = {
+			isa = PBXGroup;
+			children = (
+				D6696176D6B52CBA5EE1FF06 /* Info.plist */,
+				E40DA366EFEDD367D3DC2C96 /* LocationPushExtension.entitlements */,
+			);
+			path = LocationPushExtension;
 			sourceTree = "<group>";
 		};
 		EBDCE63AF596201C4CA2A327 /* iOS */ = {
@@ -203,11 +253,29 @@
 			);
 			dependencies = (
 				93374AAE6493F905F72FA83E /* PBXTargetDependency */,
+				555AB9D873EDC2BDF1E550C0 /* PBXTargetDependency */,
 			);
 			name = BgGeolocationExample;
 			productName = BgGeolocationExample;
 			productReference = 13B07F961A680F5B00A75B9A /* BgGeolocationExample.app */;
 			productType = "com.apple.product-type.application";
+		};
+		3DF28F22F149234D2415DC57 /* LocationPushExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0D480533A6B01D16D7EFE416 /* Build configuration list for PBXNativeTarget "LocationPushExtension" */;
+			buildPhases = (
+				F2184B378BD152439091DEFC /* Sources */,
+				BC34A52A08EC7E6CADFCB29C /* Frameworks */,
+				7CEEA92FC4A5AC4D5E33C520 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LocationPushExtension;
+			productName = LocationPushExtension;
+			productReference = BF0887F37AB8EA5AE58EB131 /* LocationPushExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		676634CB482D3FCAB46DF1D2 /* BgGeolocationLiveActivity */ = {
 			isa = PBXNativeTarget;
@@ -254,6 +322,7 @@
 			targets = (
 				13B07F861A680F5B00A75B9A /* BgGeolocationExample */,
 				676634CB482D3FCAB46DF1D2 /* BgGeolocationLiveActivity */,
+				3DF28F22F149234D2415DC57 /* LocationPushExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -266,6 +335,13 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				2FF5CC921A7CAEB7BCDBE3C1 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7CEEA92FC4A5AC4D5E33C520 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,9 +379,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -342,9 +422,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -372,9 +456,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F2184B378BD152439091DEFC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				231714B6D3E532687649BB4C /* TSLocationPushShared.swift in Sources */,
+				89585FE00F2B1496681DDAA0 /* TSLocationPushService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		555AB9D873EDC2BDF1E550C0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = LocationPushExtension;
+			target = 3DF28F22F149234D2415DC57 /* LocationPushExtension */;
+			targetProxy = F15ECF46BB1B23EB03A38824 /* PBXContainerItemProxy */;
+		};
 		93374AAE6493F905F72FA83E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = BgGeolocationLiveActivity;
@@ -384,12 +483,70 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0049EA2B950AA98803BE977D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = LocationPushExtension/LocationPushExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KVJ86QZYD3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LocationPushExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.masjidpilot.staging.location-push";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0C1B8B4D30960C303130CC89 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = LocationPushExtension/LocationPushExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = KVJ86QZYD3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LocationPushExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.masjidpilot.staging.location-push";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-BgGeolocationExample.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BgGeolocationExample/BgGeolocationExample.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KVJ86QZYD3;
 				ENABLE_BITCODE = NO;
@@ -405,7 +562,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = bggeolocation.example.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.masjidpilot.staging;
 				PRODUCT_NAME = BgGeolocationExample;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -421,6 +578,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BgGeolocationExample/BgGeolocationExample.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = KVJ86QZYD3;
 				INFOPLIST_FILE = BgGeolocationExample/Info.plist;
@@ -435,7 +593,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = bggeolocation.example.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.masjidpilot.staging;
 				PRODUCT_NAME = BgGeolocationExample;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;
@@ -461,7 +619,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = bggeolocation.example.ios.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.masjidpilot.staging.LiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -645,7 +803,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = bggeolocation.example.ios.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.masjidpilot.staging.LiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -658,6 +816,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0D480533A6B01D16D7EFE416 /* Build configuration list for PBXNativeTarget "LocationPushExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C1B8B4D30960C303130CC89 /* Release */,
+				0049EA2B950AA98803BE977D /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "BgGeolocationExample" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

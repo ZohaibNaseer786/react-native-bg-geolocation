@@ -139,6 +139,15 @@ export interface AppConfig {
   liveActivityStaleSeconds?: number;
   /** Request an ActivityKit APNs token for server-driven updates. */
   liveActivityPushUpdates?: boolean;
+  /**
+   * iOS 15+: enable the Location Push Service Extension flow. When the host app
+   * registers a location-push token and your server sends an APNs background
+   * push to it, iOS wakes the extension to capture and upload one location —
+   * even when the app is force-quit. Requires the Apple-approved
+   * `com.apple.developer.location.push` entitlement, an App Group shared with
+   * the extension, and "Always" location authorization.
+   */
+  locationPushEnabled?: boolean;
   /** iOS: start an audible audio session while tracking is enabled. */
   trackingAudioEnabled?: boolean;
   /** iOS tracking tone volume from 0.01 through 1.0. */

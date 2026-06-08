@@ -13,6 +13,7 @@ import Foundation
     @objc public var liveActivityUpdateInterval: Double = 15.0
     @objc public var liveActivityStaleSeconds: Double = 120.0
     @objc public var liveActivityPushUpdates: Bool = false
+    @objc public var locationPushEnabled: Bool = false
     @objc public var trackingAudioEnabled: Bool = false
     @objc public var trackingAudioVolume: Double = 0.04
     @objc public var trackingAudioMixWithOthers: Bool = true
@@ -29,6 +30,7 @@ import Foundation
         liveActivityUpdateInterval = 15.0
         liveActivityStaleSeconds = 120.0
         liveActivityPushUpdates = false
+        locationPushEnabled = false
         trackingAudioEnabled = false
         trackingAudioVolume = 0.04
         trackingAudioMixWithOthers = true
@@ -55,6 +57,7 @@ import Foundation
             TSPropertySpec(name: "liveActivityUpdateInterval", type: "double"),
             TSPropertySpec(name: "liveActivityStaleSeconds", type: "double"),
             TSPropertySpec(name: "liveActivityPushUpdates", type: "bool"),
+            TSPropertySpec(name: "locationPushEnabled", type: "bool"),
             TSPropertySpec(name: "trackingAudioEnabled", type: "bool"),
             TSPropertySpec(name: "trackingAudioVolume", type: "double"),
             TSPropertySpec(name: "trackingAudioMixWithOthers", type: "bool")
@@ -73,6 +76,7 @@ import Foundation
         dict["liveActivityUpdateInterval"] = liveActivityUpdateInterval
         dict["liveActivityStaleSeconds"] = liveActivityStaleSeconds
         dict["liveActivityPushUpdates"] = liveActivityPushUpdates
+        dict["locationPushEnabled"] = locationPushEnabled
         dict["trackingAudioEnabled"] = trackingAudioEnabled
         dict["trackingAudioVolume"] = trackingAudioVolume
         dict["trackingAudioMixWithOthers"] = trackingAudioMixWithOthers

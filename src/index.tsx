@@ -1,4 +1,4 @@
-import { NativeEventEmitter, AppRegistry } from 'react-native';
+import { NativeEventEmitter, AppRegistry, Platform } from 'react-native';
 import NativeBgGeolocation from './NativeBgGeolocation';
 import * as Events from './events';
 
@@ -839,6 +839,23 @@ export default class BackgroundGeolocation {
   static getDeviceInfo(): Promise<any> {
     return new Promise((resolve, reject) =>
       NativeBgGeolocation.getDeviceInfo(resolve, reject)
+    );
+  }
+
+  /**
+   * iOS only. Resolves the device's location-push APNs token (hex string), or
+   * `null` if not yet available / unsupported. Ship this token to your server
+   * so it can send APNs location pushes that wake the Location Push Service
+   * Extension and fetch a location even when the app is force-quit.
+   *
+   * Android resolves `null`.
+   */
+  static getLocationPushToken(): Promise<string | null> {
+    if (Platform.OS !== 'ios') {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve, reject) =>
+      NativeBgGeolocation.getLocationPushToken(resolve, reject)
     );
   }
 

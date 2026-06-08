@@ -200,6 +200,11 @@ export interface Spec extends TurboModule {
     success: (info: AnyObject) => void,
     failure: (error: string) => void
   ): void;
+  // iOS only: the device's location-push APNs token (hex), or null.
+  getLocationPushToken(
+    success: (token: string | null) => void,
+    failure: (error: string) => void
+  ): void;
   playSound(soundId: number): void;
 
   // NOTE: addListener/removeListeners are intentionally NOT declared here.

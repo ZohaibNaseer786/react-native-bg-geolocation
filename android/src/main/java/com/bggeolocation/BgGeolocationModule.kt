@@ -983,6 +983,12 @@ class BgGeolocationModule(reactContext: ReactApplicationContext) :
     })
   }
 
+  // iOS-only API (Location Push Service Extension). Android has no equivalent,
+  // so we always resolve null.
+  override fun getLocationPushToken(success: Callback, failure: Callback) {
+    success.invoke(null as String?)
+  }
+
   override fun playSound(soundId: Double) {
     try {
       val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
