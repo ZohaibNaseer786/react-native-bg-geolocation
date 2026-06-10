@@ -15,6 +15,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   // registration aborted) if we let it go out of scope before the callback.
   private var locationPushManager: CLLocationManager?
 
+  // Background-push completion handlers, keyed by a per-push requestId. JS calls
+  // BackgroundGeolocation.finishLocationPush(requestId) when it's done, which
+  // posts TSLocationPushFinished → we invoke + remove the matching handler.
+  private var backgroundPushCompletions: [String: (UIBackgroundFetchResult) -> Void] = [:]
+
   func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -27,6 +32,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Register for server-triggered location pushes (kill-state tracking).
     if #available(iOS 15.0, *) {
       registerForLocationPushes()
+    }
+
+    // Register for standard remote notifications (app-alive background pushes:
+    // apns-push-type=background, content-available=1).
+    application.registerForRemoteNotifications()
+
+    // When JS signals it finished handling a background push, release the app.
+    NotificationCenter.default.addObserver(
+      forName: Notification.Name("TSLocationPushFinished"),
+      object: nil,
+      queue: .main
+    ) { [weak self] note in
+      guard let requestId = note.userInfo?["requestId"] as? String else { return }
+      self?.completeBackgroundPush(requestId: requestId, result: .newData)
     }
 
     let delegate = ReactNativeDelegate()
@@ -75,6 +94,80 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       UserDefaults(suiteName: "group.com.masjidpilot.staging")?
         .set(token, forKey: "TSLocationManager_locationPushToken")
     }
+  }
+
+  // MARK: - Standard remote-notification token (background pushes)
+
+  func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    let token = deviceToken.map { String(format: "%02hhx", $0) }.joined()
+    NSLog("[BGGEO] ✅ APNs device token: \(token)")
+    UserDefaults.standard.set(token, forKey: "TSLocationManager_apnsDeviceToken")
+    // The JS layer ships this to the server (see registerApnsDeviceToken()).
+  }
+
+  func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    NSLog("[BGGEO] APNs registration failed: \(error.localizedDescription)")
+  }
+
+  // MARK: - Background push → JS → socket
+
+  // apns-push-type=background, content-available=1. Fires only while the app
+  // process is alive (foreground or backgrounded-but-not-killed). We hand the
+  // location-query id to JS, which fetches a location and emits it over the
+  // socket, then calls finishLocationPush(requestId).
+  func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    let queryId = Self.extractLocationQueryId(userInfo)
+    guard let queryId = queryId else {
+      NSLog("[BGGEO] background push without location-query id — ignoring")
+      completionHandler(.noData)
+      return
+    }
+
+    let requestId = UUID().uuidString
+    backgroundPushCompletions[requestId] = completionHandler
+    NSLog("[BGGEO] background push → JS (requestId=\(requestId), query=\(queryId))")
+
+    NotificationCenter.default.post(
+      name: Notification.Name("TSLocationPushBackground"),
+      object: nil,
+      userInfo: ["requestId": requestId, "locationQueryId": queryId]
+    )
+
+    // Safety net: iOS gives us ~30s. If JS never calls finishLocationPush,
+    // release the app ourselves so we don't get killed for over-running.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
+      self?.completeBackgroundPush(requestId: requestId, result: .failed)
+    }
+  }
+
+  private func completeBackgroundPush(requestId: String, result: UIBackgroundFetchResult) {
+    guard let handler = backgroundPushCompletions.removeValue(forKey: requestId) else { return }
+    NSLog("[BGGEO] completing background push requestId=\(requestId)")
+    handler(result)
+  }
+
+  private static func extractLocationQueryId(_ userInfo: [AnyHashable: Any]) -> String? {
+    let candidates = ["location-query", "locationQuery", "location_query",
+                      "locationQueryId", "queryId", "query-id"]
+    var scopes: [[AnyHashable: Any]] = [userInfo]
+    if let aps = userInfo["aps"] as? [AnyHashable: Any] { scopes.append(aps) }
+    for scope in scopes {
+      for key in candidates {
+        if let s = scope[key] as? String, !s.isEmpty { return s }
+        if let n = scope[key] as? NSNumber { return n.stringValue }
+      }
+    }
+    return nil
   }
 }
 

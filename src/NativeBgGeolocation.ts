@@ -205,6 +205,25 @@ export interface Spec extends TurboModule {
     success: (token: string | null) => void,
     failure: (error: string) => void
   ): void;
+  // iOS only: the device's standard APNs token (hex) for background pushes, or null.
+  getApnsDeviceToken(
+    success: (token: string | null) => void,
+    failure: (error: string) => void
+  ): void;
+  // iOS only: hand the Location Push Service Extension its delivery config
+  // (preferred socket channel + REST fallback details).
+  setLocationPushConfig(
+    config: AnyObject,
+    success: () => void,
+    failure: (error: string) => void
+  ): void;
+  // iOS only: signal that JS finished handling a background location push
+  // (so the native completion handler can be invoked).
+  finishLocationPush(
+    requestId: string,
+    success: () => void,
+    failure: (error: string) => void
+  ): void;
   playSound(soundId: number): void;
 
   // NOTE: addListener/removeListeners are intentionally NOT declared here.

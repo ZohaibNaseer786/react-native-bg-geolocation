@@ -14,3 +14,4 @@ export const ENABLEDCHANGE = 'enabledchange';
 export const POWERSAVECHANGE = 'powersavechange';
 export const NOTIFICATIONACTION = 'notificationaction';
 export const AUTHORIZATION = 'authorization';
+export const LOCATIONPUSH = 'locationpush';

@@ -38,6 +38,20 @@ import Foundation
     public static let keyAuthorization  = "TSLocationPush_authorization"
     public static let keyAccessToken    = "TSLocationPush_accessToken"
 
+    // Socket delivery (preferred channel for the extension). Written by the host
+    // app via BackgroundGeolocation.setLocationPushConfig({...}). When socketUrl
+    // is present the extension tries Socket.IO first, then falls back to REST.
+    public static let keySocketUrl       = "TSLocationPush_socketUrl"
+    public static let keySocketPath      = "TSLocationPush_socketPath"
+    public static let keySocketEvent     = "TSLocationPush_socketEvent"
+    public static let keySocketAuthToken = "TSLocationPush_socketAuthToken"
+    public static let keySocketTimeout   = "TSLocationPush_socketTimeout"
+
+    // REST fallback used when the socket fails: POST {latitude, longitude,
+    // fcmToken, userCurrentTime} to fallbackUrl.
+    public static let keyFallbackUrl     = "TSLocationPush_fallbackUrl"
+    public static let keyFcmToken        = "TSLocationPush_fcmToken"
+
     // The location push token (hex) the host app obtained from
     // `startMonitoringLocationPushesWithCompletion`. Stored in BOTH the standard
     // and the shared suite so JS can read it via getLocationPushToken().

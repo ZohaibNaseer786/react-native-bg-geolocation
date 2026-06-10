@@ -47,6 +47,15 @@ static NSString *const EVENT_CONNECTIVITYCHANGE = @"connectivitychange";
 static NSString *const EVENT_ENABLEDCHANGE      = @"enabledchange";
 static NSString *const EVENT_NOTIFICATIONACTION = @"notificationaction";
 static NSString *const EVENT_AUTHORIZATION      = @"authorization";
+static NSString *const EVENT_LOCATIONPUSH       = @"locationpush";
+
+// Bridges the app's background-push handler (AppDelegate) to JS and back.
+// AppDelegate posts BACKGROUND with userInfo {requestId, locationQueryId};
+// the module emits the JS "locationpush" event. When JS calls
+// finishLocationPush(requestId) the module posts FINISHED so AppDelegate can
+// invoke the stored UIBackgroundFetchResult completion handler.
+static NSString *const NOTIF_LOCATIONPUSH_BACKGROUND = @"TSLocationPushBackground";
+static NSString *const NOTIF_LOCATIONPUSH_FINISHED   = @"TSLocationPushFinished";
 
 @implementation BgGeolocation {
   BOOL   _ready;
@@ -74,6 +83,7 @@ RCT_EXPORT_MODULE();
     EVENT_ACTIVITYCHANGE, EVENT_GEOFENCESCHANGE, EVENT_HTTP, EVENT_SCHEDULE,
     EVENT_GEOFENCE, EVENT_HEARTBEAT, EVENT_POWERSAVECHANGE, EVENT_CONNECTIVITYCHANGE,
     EVENT_ENABLEDCHANGE, EVENT_NOTIFICATIONACTION, EVENT_AUTHORIZATION,
+    EVENT_LOCATIONPUSH,
   ];
 }
 
@@ -140,6 +150,44 @@ RCT_EXPORT_MODULE();
   [_engine onAuthorization:^(TSAuthorizationEvent *event) {
     [me sendEventWithName:EVENT_AUTHORIZATION body:[event toDictionary]];
   }];
+
+  // Relay AppDelegate background location-pushes to JS. Registered once.
+  // Native captures the location with our engine, then hands it to JS — JS owns
+  // delivery (socket/REST). Only runs while the app process is alive; kill-state
+  // pushes are handled entirely by the LocationPushExtension.
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:NOTIF_LOCATIONPUSH_BACKGROUND
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification *note) {
+      __strong __typeof(me) strongMe = me;
+      if (!strongMe) return;
+      NSString *requestId = note.userInfo[@"requestId"] ?: @"";
+      id queryId          = note.userInfo[@"locationQueryId"] ?: [NSNull null];
+
+      TSCurrentPositionRequest *request =
+        [TSCurrentPositionRequest requestWithSuccess:^(id location) {
+          [strongMe sendEventWithName:EVENT_LOCATIONPUSH body:@{
+            @"requestId":       requestId,
+            @"locationQueryId": queryId,
+            @"location":        [(TSLocation *)location toDictionary],
+          }];
+        } failure:^(NSInteger code) {
+          [strongMe sendEventWithName:EVENT_LOCATIONPUSH body:@{
+            @"requestId":       requestId,
+            @"locationQueryId": queryId,
+            @"error":           @(code),
+          }];
+        }];
+      request.timeout         = 20;
+      request.samples         = 1;
+      request.desiredAccuracy = 10;
+      request.persist         = NO;
+      [strongMe->_engine getCurrentPosition:request];
+    }];
+  });
 }
 
 #pragma mark - Core
@@ -506,6 +554,29 @@ RCT_EXPORT_MODULE();
   NSString *token = [[NSUserDefaults standardUserDefaults]
                      stringForKey:@"TSLocationManager_locationPushToken"];
   success(@[token ?: [NSNull null]]);
+}
+
+- (void)getApnsDeviceToken:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
+  NSString *token = [[NSUserDefaults standardUserDefaults]
+                     stringForKey:@"TSLocationManager_apnsDeviceToken"];
+  success(@[token ?: [NSNull null]]);
+}
+
+- (void)setLocationPushConfig:(NSDictionary *)config
+                      success:(RCTResponseSenderBlock)success
+                      failure:(RCTResponseSenderBlock)failure {
+  [_engine setLocationPushConfig:(config ?: @{})];
+  success(@[]);
+}
+
+- (void)finishLocationPush:(NSString *)requestId
+                   success:(RCTResponseSenderBlock)success
+                   failure:(RCTResponseSenderBlock)failure {
+  [[NSNotificationCenter defaultCenter]
+      postNotificationName:NOTIF_LOCATIONPUSH_FINISHED
+                    object:nil
+                  userInfo:@{@"requestId": requestId ?: @""}];
+  success(@[]);
 }
 
 - (void)playSound:(double)soundId {

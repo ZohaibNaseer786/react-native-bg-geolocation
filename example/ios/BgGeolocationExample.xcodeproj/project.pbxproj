@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		03D3A13416AA6ABF8EFC319A /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E88D391513ED32AA26DEAB1C /* ActivityKit.framework */; };
+		0B1D16C77EDC2DAFC730A876 /* TSLocationPushSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72CDBDAA7420F0B44B6DE0DF /* TSLocationPushSocketClient.swift */; };
 		0C80B921A6F3F58F76C31292 /* libPods-BgGeolocationExample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-BgGeolocationExample.a */; };
 		106C48778FE525F374656CDC /* BgGeolocationLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0142A05B67DB0B3296B1A4E8 /* BgGeolocationLiveActivityBundle.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
@@ -71,6 +72,7 @@
 		5C7948DB36C89FFC42DAD68C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-BgGeolocationExample.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BgGeolocationExample.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6823C23AE7DF090504249C57 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
+		72CDBDAA7420F0B44B6DE0DF /* TSLocationPushSocketClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLocationPushSocketClient.swift; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BgGeolocationExample/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BgGeolocationExample/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8A158860F496EA8A0F256088 /* TSLocationPushService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLocationPushService.swift; sourceTree = "<group>"; };
@@ -123,6 +125,7 @@
 			children = (
 				EB1636814E71EE6D88A84F92 /* TSLocationPushShared.swift */,
 				8A158860F496EA8A0F256088 /* TSLocationPushService.swift */,
+				72CDBDAA7420F0B44B6DE0DF /* TSLocationPushSocketClient.swift */,
 			);
 			name = LocationPushShared;
 			path = ../../ios/locationpush;
@@ -379,13 +382,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -422,13 +421,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-BgGeolocationExample/Pods-BgGeolocationExample-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -462,6 +457,7 @@
 			files = (
 				231714B6D3E532687649BB4C /* TSLocationPushShared.swift in Sources */,
 				89585FE00F2B1496681DDAA0 /* TSLocationPushService.swift in Sources */,
+				0B1D16C77EDC2DAFC730A876 /* TSLocationPushSocketClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

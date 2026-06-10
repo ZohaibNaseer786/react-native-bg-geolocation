@@ -804,6 +804,34 @@ export default class BackgroundGeolocation {
     return BackgroundGeolocation.addListener(Events.AUTHORIZATION, callback);
   }
 
+  /**
+   * iOS only. Fires when a background location push (apns-push-type: background)
+   * wakes the live app. The event carries `{ requestId, locationQueryId }`.
+   * Your handler should obtain a location and deliver it (e.g. via socket), then
+   * call `BackgroundGeolocation.finishLocationPush(requestId)` so iOS can release
+   * the app — within ~25s, or iOS ends it for you.
+   *
+   * Kill-state pushes (apns-push-type: location) are handled natively by the
+   * Location Push Service Extension instead and never reach JS.
+   */
+  static onLocationPush(callback: Function): Subscription {
+    return BackgroundGeolocation.addListener(Events.LOCATIONPUSH, callback);
+  }
+
+  /**
+   * iOS only. Tell the native layer that JS finished handling the background
+   * location push identified by `requestId` (from the onLocationPush event).
+   * No-op on Android.
+   */
+  static finishLocationPush(requestId: string): Promise<void> {
+    if (Platform.OS !== 'ios') {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) =>
+      NativeBgGeolocation.finishLocationPush(requestId, resolve, reject)
+    );
+  }
+
   // ─── Logging / Debug ──────────────────────────────────────────────────────
   static setLogLevel(value: number): Promise<any> {
     return new Promise((resolve, reject) =>
@@ -856,6 +884,50 @@ export default class BackgroundGeolocation {
     }
     return new Promise((resolve, reject) =>
       NativeBgGeolocation.getLocationPushToken(resolve, reject)
+    );
+  }
+
+  /**
+   * iOS only. Resolves the device's standard APNs token (hex), or `null`. Ship
+   * this to your server so it can send background pushes (apns-push-type:
+   * background, content-available:1) that wake the live app for the hybrid
+   * native→JS→socket path. Android resolves `null`.
+   */
+  static getApnsDeviceToken(): Promise<string | null> {
+    if (Platform.OS !== 'ios') {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve, reject) =>
+      NativeBgGeolocation.getApnsDeviceToken(resolve, reject)
+    );
+  }
+
+  /**
+   * iOS only. Provide the Location Push Service Extension with its delivery
+   * config so it can report a location when woken by an APNs location push —
+   * even when the app is force-quit. The extension tries the socket channel
+   * first, then falls back to REST.
+   *
+   * @param config
+   *   socketUrl?: string       base URL, e.g. https://host
+   *   socketPath?: string      socket.io path, e.g. /socket/location
+   *   socketEvent?: string     emit event name, e.g. location:update
+   *   socketAuthToken?: string bearer/JWT sent in the socket CONNECT auth
+   *   socketTimeout?: number   seconds before falling back to REST (default 8)
+   *   url?: string             REST fallback endpoint (defaults to http.url)
+   *   accessToken?: string     bearer for the REST fallback
+   *   extras?: object          merged into the uploaded location's `extras`
+   *
+   * No-op on Android.
+   */
+  static setLocationPushConfig(
+    config: Record<string, any>
+  ): Promise<void> {
+    if (Platform.OS !== 'ios') {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) =>
+      NativeBgGeolocation.setLocationPushConfig(config, resolve, reject)
     );
   }
 

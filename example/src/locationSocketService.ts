@@ -2,7 +2,8 @@ import { io, type Socket } from 'socket.io-client';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 export const SERVER_BASE_URL = 'https://masjidpilot.duckdns.org';
-const SOCKET_PATH = '/socket/location';
+export const SOCKET_PATH = '/socket/location';
+export const SOCKET_LOCATION_EVENT = 'location:update';
 const CONNECT_TIMEOUT_MS = 6_000;
 const ACK_TIMEOUT_MS = 10_000;
 
@@ -14,42 +15,63 @@ export interface Coordinates {
   longitude: number;
 }
 
+// REST fallback used when the socket can't deliver.
+const FALLBACK_PATH = '/api/location/fallback';
+
 const fmt = (l: Coordinates) =>
   `${l.latitude.toFixed(6)}, ${l.longitude.toFixed(6)}`;
+
+// Local wall-clock time as "HH:mm" (matches the fallback payload's userCurrentTime).
+function currentTimeHHmm(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// The device push token the fallback endpoint keys off. Set via setFcmToken();
+// on iOS without a Firebase integration, pass the APNs device token instead.
+let fcmToken: string | null = null;
+export function setFcmToken(token: string | null): void {
+  fcmToken = token;
+}
+export function getFcmToken(): string | null {
+  return fcmToken;
+}
 
 let socket: Socket | null = null;
 let queuedLocation: Coordinates | null = null;
 
-// ─── HTTP fallback ────────────────────────────────────────────────────────────
+// ─── REST fallback ──────────────────────────────────────────────────────────
 /**
- * Plain fetch()-based REST POST.
+ * REST fallback used when the socket can't deliver. POSTs to
+ * /api/location/fallback with the payload the backend expects.
  *
- * Used in two situations:
+ * Used when:
  *   1. Socket can't connect (background/foreground fallback).
- *   2. Kill state / headless task — socket.io is unreliable in short-lived JS
+ *   2. Socket ack times out.
+ *   3. Kill state / headless task — socket.io is unreliable in short-lived JS
  *      contexts because it needs TCP → TLS → WS upgrade → auth before emitting.
- *      A simple fetch() POST works immediately.
  */
 export async function sendLocationViaHttp(loc: Coordinates): Promise<boolean> {
   try {
-    console.log('[BgGeoTest][LocationSocket] 🌐 HTTP fallback →', fmt(loc));
-    const res = await fetch(`${SERVER_BASE_URL}/location`, {
+    console.log('[BgGeoTest][LocationSocket] 🌐 REST fallback →', fmt(loc));
+    const res = await fetch(`${SERVER_BASE_URL}${FALLBACK_PATH}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${AUTH_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        lat: loc.latitude,
-        long: loc.longitude,
         latitude: loc.latitude,
         longitude: loc.longitude,
+        fcmToken: fcmToken ?? '',
+        userCurrentTime: currentTimeHHmm(),
       }),
     });
-    console.log('[BgGeoTest][LocationSocket] 🌐 HTTP status:', res.status);
+    console.log('[BgGeoTest][LocationSocket] 🌐 REST status:', res.status);
     return res.ok;
   } catch (e: any) {
-    console.log('[BgGeoTest][LocationSocket] 🌐 HTTP error:', e?.message ?? e);
+    console.log('[BgGeoTest][LocationSocket] 🌐 REST error:', e?.message ?? e);
     return false;
   }
 }

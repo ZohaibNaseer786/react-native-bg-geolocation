@@ -989,6 +989,21 @@ class BgGeolocationModule(reactContext: ReactApplicationContext) :
     success.invoke(null as String?)
   }
 
+  // iOS-only API (standard APNs token). Android has FCM instead → null here.
+  override fun getApnsDeviceToken(success: Callback, failure: Callback) {
+    success.invoke(null as String?)
+  }
+
+  // iOS-only API (Location Push Service Extension). No-op on Android.
+  override fun setLocationPushConfig(config: ReadableMap, success: Callback, failure: Callback) {
+    success.invoke()
+  }
+
+  // iOS-only API (background location-push JS handoff). No-op on Android.
+  override fun finishLocationPush(requestId: String, success: Callback, failure: Callback) {
+    success.invoke()
+  }
+
   override fun playSound(soundId: Double) {
     try {
       val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)

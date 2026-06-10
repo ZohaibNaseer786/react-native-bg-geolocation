@@ -25,9 +25,12 @@ import BackgroundGeolocation, {
 import {
   AUTH_TOKEN,
   SERVER_BASE_URL,
+  SOCKET_PATH,
+  SOCKET_LOCATION_EVENT,
   connectLocationSocket,
   disconnectLocationSocket,
   sendLocationToSocket,
+  setFcmToken,
   type Coordinates,
 } from './locationSocketService';
 
@@ -262,14 +265,64 @@ function registerListeners(): void {
     BackgroundGeolocation.onProviderChange((event: any) => {
       log(`providerchange enabled=${event.enabled} gps=${event.gps}`);
     }),
+    // Hybrid app-alive path: a background push (app not killed) → native →
+    // this JS handler → socket. Kill-state pushes go to the native extension
+    // instead and never reach here.
+    BackgroundGeolocation.onLocationPush((event: any) => {
+      void handleBackgroundLocationPush(event);
+    }),
   ];
+}
+
+/**
+ * Handle a background location push delivered to the live app. The NATIVE SDK
+ * already captured the location with our engine and handed it to us here — JS
+ * only owns delivery: send over the socket (REST fallback to
+ * /api/location/fallback lives inside sendLocationToSocket), then tell native
+ * we're done so iOS can release the app.
+ */
+async function handleBackgroundLocationPush(event: {
+  requestId: string;
+  locationQueryId?: string;
+  location?: Location;
+  error?: number;
+}): Promise<void> {
+  log(`📲 background location push (query=${event.locationQueryId ?? '—'})`);
+  try {
+    if (event.location?.coords) {
+      await sendLocationUpdate(event.location, { force: true });
+    } else {
+      log(`background push had no location (error=${event.error ?? '—'})`);
+    }
+  } catch (err) {
+    log(`background push handler error: ${String(err)}`);
+  } finally {
+    // Always release the app, even on error/timeout.
+    await BackgroundGeolocation.finishLocationPush(event.requestId).catch(
+      () => {}
+    );
+  }
 }
 
 async function ensureReady(): Promise<State> {
   if (!readyPromise) {
     registerListeners();
     readyPromise = BackgroundGeolocation.ready(getConfig());
-    readyPromise.then(() => {
+    readyPromise.then(async () => {
+      // Hand the Location Push Service Extension its delivery config (socket
+      // first, REST fallback) BEFORE registering the token, so the extension is
+      // ready to report the instant the server pushes a location-query.
+      await BackgroundGeolocation.setLocationPushConfig({
+        socketUrl: SERVER_BASE_URL,
+        socketPath: SOCKET_PATH,
+        socketEvent: SOCKET_LOCATION_EVENT,
+        socketAuthToken: AUTH_TOKEN,
+        socketTimeout: 8,
+        // Socket-failure REST fallback: POST {latitude, longitude, fcmToken,
+        // userCurrentTime} to /api/location/fallback.
+        fallbackUrl: `${SERVER_BASE_URL}/api/location/fallback`,
+      }).catch(() => {});
+
       // Fire-and-forget: ship the iOS location-push token to the server so it
       // can trigger kill-state location fetches via the Location Push Service
       // Extension. No-op on Android (resolves null).
@@ -315,13 +368,73 @@ export async function registerLocationPushToken(): Promise<string | null> {
       body: JSON.stringify({
         token,
         platform: 'ios',
-        // apns-topic the server must use when pushing to this token.
-        topic: 'com.masjidpilot.staging.location-push',
+        // apns-topic the server must use when pushing to this token:
+        // <main-bundle-id>.location-query, apns-push-type: location.
+        topic: 'com.masjidpilot.staging.location-query',
       }),
     });
     log(`location-push token register → HTTP ${res.status}`);
   } catch (err) {
     log(`❌ failed to register location-push token: ${String(err)}`);
+  }
+
+  // Also register the STANDARD APNs token for the hybrid app-alive path
+  // (apns-push-type: background → wakes the live app → JS → socket).
+  void registerApnsDeviceToken();
+
+  return token;
+}
+
+/**
+ * iOS only. Registers the standard APNs device token with the server so it can
+ * send background pushes (apns-push-type: background, content-available: 1) to
+ * the live app for the native→JS→socket path.
+ */
+export async function registerApnsDeviceToken(): Promise<string | null> {
+  if (Platform.OS !== 'ios') return null;
+
+  let token: string | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    token = await BackgroundGeolocation.getApnsDeviceToken().catch(() => null);
+    if (token) break;
+    await sleep(1500);
+  }
+  if (!token) {
+    log('⚠️ APNs device token not available yet');
+    return null;
+  }
+
+  log(`🔑 APNs device token: ${token.slice(0, 12)}…`);
+
+  // The /api/location/fallback payload keys off fcmToken. This example has no
+  // Firebase integration, so we use the APNs token as the device identifier —
+  // swap in a real FCM token here if your backend expects one.
+  setFcmToken(token);
+  // Hand the same token to the native Location Push Extension so its REST
+  // fallback can populate fcmToken in kill-state too. (Partial update — leaves
+  // the socket config from ensureReady untouched.)
+  void BackgroundGeolocation.setLocationPushConfig({ fcmToken: token }).catch(
+    () => {}
+  );
+
+  try {
+    const res = await fetch(`${SERVER_BASE_URL}/location-push/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${AUTH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        token,
+        platform: 'ios',
+        kind: 'apns-background',
+        // Background pushes use the plain app bundle id as apns-topic.
+        topic: 'com.masjidpilot.staging',
+      }),
+    });
+    log(`APNs device token register → HTTP ${res.status}`);
+  } catch (err) {
+    log(`❌ failed to register APNs device token: ${String(err)}`);
   }
   return token;
 }

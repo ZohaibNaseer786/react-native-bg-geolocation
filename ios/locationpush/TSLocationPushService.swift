@@ -5,26 +5,28 @@
 //  (CLLocationPushServiceExtension, iOS 15+).
 //
 //  ── WHAT THIS IS ──────────────────────────────────────────────────────────
-//  When your server sends an APNs push to the device's *location-push* token,
-//  iOS launches THIS extension in a separate, short-lived process — even if the
-//  host app has been force-quit / terminated. The extension grabs one location
-//  fix and POSTs it to your server, then signals completion and is torn down.
+//  When your server sends an APNs push (apns-push-type: location, apns-topic:
+//  <bundle-id>.location-query) to the device's location-push token, iOS launches
+//  THIS extension in a separate, short-lived process — even if the host app has
+//  been force-quit. The extension grabs one location fix and ships it to your
+//  server, then signals completion and is torn down.
 //
-//  This is the production mechanism rideshare / delivery apps use to keep
-//  tracking a user after the app is killed. It does NOT load React Native or the
-//  full TSLocationManager engine — it must stay lightweight and only use
-//  extension-safe APIs (CoreLocation + URLSession + UserDefaults).
+//  ── DELIVERY ──────────────────────────────────────────────────────────────
+//  The push payload carries a `location-query` id. Its presence means "capture
+//  and report a location now". We:
+//    1. requestLocation() — one GPS fix.
+//    2. Try Socket.IO (`location:update`) first, if socket config is present.
+//    3. Fall back to REST POST to the configured `url`.
+//  The captured location-query id is echoed back so the server can correlate.
 //
 //  ── REQUIREMENTS ──────────────────────────────────────────────────────────
-//    • Apple-approved entitlement `com.apple.developer.location.push` on BOTH
-//      the host app and this extension.
-//    • App Group shared between host app and extension (see TSLocationPushShared).
-//    • The host app must call `startMonitoringLocationPushesWithCompletion`
-//      and ship the returned token to your server.
-//    • The user must have granted "Always" location authorization.
+//    • Apple-approved `com.apple.developer.location.push` entitlement.
+//    • App Group shared with the host app (see TSLocationPushShared).
+//    • Host app calls startMonitoringLocationPushes + ships the token to server.
+//    • "Always" location authorization.
 //
-//  The extension has a hard ~30s wall-clock budget. requestLocation() + the
-//  HTTP POST must finish within it, else `serviceExtensionWillTerminate` fires.
+//  ~30s wall-clock budget. The socket attempt is tightly timed so REST always
+//  has room to run.
 //
 
 import CoreLocation
@@ -43,7 +45,6 @@ public final class TSLocationPushService: NSObject, CLLocationPushServiceExtensi
         super.init()
     }
 
-    // Called by iOS when an APNs location push arrives for this device.
     public func didReceiveLocationPushPayload(
         _ payload: [String: Any],
         completion: @escaping () -> Void
@@ -51,8 +52,16 @@ public final class TSLocationPushService: NSObject, CLLocationPushServiceExtensi
         TSLocationPushLog.log("didReceiveLocationPushPayload: \(payload)")
         self.completion = completion
 
-        // Build a single-shot fetcher that grabs a location then POSTs it.
-        let fetcher = TSLocationPushFetcher(payload: payload) { [weak self] in
+        let queryId = Self.extractLocationQueryId(from: payload)
+        guard let queryId = queryId else {
+            // No location-query id → nothing to report. Finish cleanly.
+            TSLocationPushLog.log("no location-query id in payload — ignoring")
+            finish()
+            return
+        }
+        TSLocationPushLog.log("location-query id = \(queryId)")
+
+        let fetcher = TSLocationPushFetcher(queryId: queryId) { [weak self] in
             self?.finish()
         }
         self.fetcher = fetcher
@@ -61,12 +70,9 @@ public final class TSLocationPushService: NSObject, CLLocationPushServiceExtensi
         mgr.delegate = fetcher
         mgr.desiredAccuracy = kCLLocationAccuracyBest
         self.manager = mgr
-
-        // One-shot delivery: iOS sends a single fix to didUpdateLocations.
-        mgr.requestLocation()
+        mgr.requestLocation() // one-shot
     }
 
-    // iOS is about to terminate the extension (time budget exhausted). Be clean.
     public func serviceExtensionWillTerminate() {
         TSLocationPushLog.log("serviceExtensionWillTerminate — flushing")
         fetcher?.flushPendingIfNeeded()
@@ -80,26 +86,46 @@ public final class TSLocationPushService: NSObject, CLLocationPushServiceExtensi
         self.fetcher = nil
         completion()
     }
+
+    /// Pull the location-query id out of the push payload. Accepts several key
+    /// spellings so it survives server-side naming differences.
+    static func extractLocationQueryId(from payload: [String: Any]) -> String? {
+        let candidates = ["location-query", "locationQuery", "location_query",
+                          "locationQueryId", "queryId", "query-id"]
+        // Top level, then nested under "aps".
+        var scopes: [[String: Any]] = [payload]
+        if let aps = payload["aps"] as? [String: Any] { scopes.append(aps) }
+        for scope in scopes {
+            for key in candidates {
+                if let value = scope[key] {
+                    if let s = value as? String, !s.isEmpty { return s }
+                    if let n = value as? NSNumber { return n.stringValue }
+                }
+            }
+        }
+        return nil
+    }
 }
 
-// MARK: - Location fetcher + HTTP poster
+// MARK: - Location fetcher + delivery
 
 @available(iOS 15.0, *)
 final class TSLocationPushFetcher: NSObject, CLLocationManagerDelegate {
 
-    private let payload: [String: Any]
+    private let queryId: String
     private let completion: () -> Void
     private var didComplete = false
+    private var socketClient: TSLocationPushSocketClient?
 
-    init(payload: [String: Any], completion: @escaping () -> Void) {
-        self.payload = payload
+    init(queryId: String, completion: @escaping () -> Void) {
+        self.queryId = queryId
         self.completion = completion
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard !didComplete, let location = locations.last else { return }
         TSLocationPushLog.log("got location \(location.coordinate.latitude),\(location.coordinate.longitude)")
-        post(location: location)
+        deliver(location: location)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -108,77 +134,144 @@ final class TSLocationPushFetcher: NSObject, CLLocationManagerDelegate {
         complete()
     }
 
-    // Called from serviceExtensionWillTerminate if we never got a fix.
     func flushPendingIfNeeded() {
         guard !didComplete else { return }
         TSLocationPushLog.log("terminated before location fix arrived")
     }
 
-    // MARK: HTTP
+    // MARK: Delivery — socket first, REST fallback
 
-    private func post(location: CLLocation) {
+    private func deliver(location: CLLocation) {
         guard !didComplete else { return }
         didComplete = true
 
         guard let defaults = TSLocationPushShared.sharedDefaults() else {
-            TSLocationPushLog.log("App Group not configured — cannot read server config")
+            TSLocationPushLog.log("App Group not configured — cannot deliver")
             complete()
             return
         }
 
-        let urlString = defaults.string(forKey: TSLocationPushShared.keyUrl) ?? ""
-        guard !urlString.isEmpty, let url = URL(string: urlString) else {
-            TSLocationPushLog.log("no server URL configured — skipping POST")
-            complete()
+        if let socketUrlString = defaults.string(forKey: TSLocationPushShared.keySocketUrl),
+           !socketUrlString.isEmpty,
+           let socketUrl = URL(string: socketUrlString) {
+            let path  = defaults.string(forKey: TSLocationPushShared.keySocketPath) ?? "/socket.io"
+            let event = defaults.string(forKey: TSLocationPushShared.keySocketEvent) ?? "location:update"
+            let token = defaults.string(forKey: TSLocationPushShared.keySocketAuthToken)
+            let timeout = defaults.object(forKey: TSLocationPushShared.keySocketTimeout) as? Double ?? 8.0
+
+            TSLocationPushLog.log("attempting socket delivery → \(socketUrlString)\(path)")
+            let client = TSLocationPushSocketClient(config: .init(
+                url: socketUrl, path: path, event: event,
+                authToken: token, timeout: timeout
+            ))
+            self.socketClient = client
+            client.emit(socketPayload(location: location)) { [weak self] ok in
+                guard let self = self else { return }
+                if ok {
+                    TSLocationPushLog.log("✅ delivered via socket")
+                    self.complete()
+                } else {
+                    TSLocationPushLog.log("socket failed → REST fallback")
+                    self.postViaRest(location: location, defaults: defaults)
+                }
+            }
             return
         }
 
-        let method       = defaults.string(forKey: TSLocationPushShared.keyMethod) ?? "POST"
+        postViaRest(location: location, defaults: defaults)
+    }
+
+    private func postViaRest(location: CLLocation, defaults: UserDefaults) {
         let headers      = defaults.dictionary(forKey: TSLocationPushShared.keyHeaders) as? [String: String] ?? [:]
-        let params       = defaults.dictionary(forKey: TSLocationPushShared.keyParams) ?? [:]
-        let extras       = defaults.dictionary(forKey: TSLocationPushShared.keyExtras) ?? [:]
-        let rootProperty = defaults.string(forKey: TSLocationPushShared.keyRootProperty) ?? "location"
-        let accessToken  = defaults.string(forKey: TSLocationPushShared.keyAccessToken)
+        // Same JWT the socket uses; fall back to the http-config access token.
+        let bearer = defaults.string(forKey: TSLocationPushShared.keySocketAuthToken)
+            ?? defaults.string(forKey: TSLocationPushShared.keyAccessToken)
 
-        let locationDict = Self.buildLocation(location: location, extras: extras)
+        let url: URL
+        let body: [String: Any]
 
-        // Compose the request body. When rootProperty is set, nest the location
-        // under it (matches the engine's HTTP format) and merge top-level params.
-        var body: [String: Any] = [:]
-        if rootProperty.isEmpty || rootProperty == "." {
-            body = locationDict
+        // Preferred fallback: POST {latitude, longitude, fcmToken, userCurrentTime}
+        // to /api/location/fallback (the backend's socket-failure endpoint).
+        if let fallbackString = defaults.string(forKey: TSLocationPushShared.keyFallbackUrl),
+           !fallbackString.isEmpty, let fallbackUrl = URL(string: fallbackString) {
+            url = fallbackUrl
+            body = [
+                "latitude": location.coordinate.latitude,
+                "longitude": location.coordinate.longitude,
+                "fcmToken": defaults.string(forKey: TSLocationPushShared.keyFcmToken) ?? "",
+                "userCurrentTime": Self.currentTimeHHmm(),
+                "location_query_id": queryId
+            ]
+            TSLocationPushLog.log("REST fallback → \(fallbackString)")
         } else {
-            body[rootProperty] = locationDict
+            // Generic record POST to the configured http.url (legacy path).
+            let urlString = defaults.string(forKey: TSLocationPushShared.keyUrl) ?? ""
+            guard !urlString.isEmpty, let generic = URL(string: urlString) else {
+                TSLocationPushLog.log("no REST url configured — giving up")
+                complete()
+                return
+            }
+            url = generic
+            let extras       = defaults.dictionary(forKey: TSLocationPushShared.keyExtras) ?? [:]
+            let params       = defaults.dictionary(forKey: TSLocationPushShared.keyParams) ?? [:]
+            let rootProperty = defaults.string(forKey: TSLocationPushShared.keyRootProperty) ?? "location"
+            let locationDict = restLocation(location: location, extras: extras)
+            var generated: [String: Any] = [:]
+            if rootProperty.isEmpty || rootProperty == "." {
+                generated = locationDict
+            } else {
+                generated[rootProperty] = locationDict
+            }
+            for (key, value) in params { generated[key] = value }
+            generated["location_query_id"] = queryId
+            body = generated
+            TSLocationPushLog.log("REST → \(urlString)")
         }
-        for (key, value) in params { body[key] = value }
 
         var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.timeoutInterval = 25
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = accessToken, !token.isEmpty {
+        if let token = bearer, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
 
-        TSLocationPushLog.log("POST \(method) -> \(urlString)")
-
-        let task = URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
             if let error = error {
-                TSLocationPushLog.log("HTTP error: \(error.localizedDescription)")
+                TSLocationPushLog.log("REST error: \(error.localizedDescription)")
             } else if let http = response as? HTTPURLResponse {
-                TSLocationPushLog.log("HTTP \(http.statusCode)")
+                TSLocationPushLog.log("REST HTTP \(http.statusCode)")
             }
             self?.complete()
-        }
-        task.resume()
+        }.resume()
     }
 
-    private static func buildLocation(location: CLLocation, extras: [String: Any]) -> [String: Any] {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    private static func currentTimeHHmm() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: Date())
+    }
 
+    // MARK: Payloads
+
+    /// Flat payload the JS socket server expects (mirrors `location:update`).
+    private func socketPayload(location: CLLocation) -> [String: Any] {
+        [
+            "latitude": location.coordinate.latitude,
+            "longitude": location.coordinate.longitude,
+            "accuracy": max(location.horizontalAccuracy, 0),
+            "speed": location.speed,
+            "heading": location.course,
+            "altitude": location.altitude,
+            "timestamp": Self.iso8601(location.timestamp),
+            "location_query_id": queryId,
+            "source": "location-push"
+        ]
+    }
+
+    private func restLocation(location: CLLocation, extras: [String: Any]) -> [String: Any] {
         var coords: [String: Any] = [
             "latitude": location.coordinate.latitude,
             "longitude": location.coordinate.longitude,
@@ -190,23 +283,33 @@ final class TSLocationPushFetcher: NSObject, CLLocationManagerDelegate {
             "altitude": location.altitude,
             "altitude_accuracy": location.verticalAccuracy
         ]
-        if location.floor != nil {
-            coords["floor"] = location.floor?.level as Any
-        }
+        if let floor = location.floor { coords["floor"] = floor.level }
 
-        var mergedExtras: [String: Any] = ["LocationPushService": true]
+        var mergedExtras: [String: Any] = ["LocationPushService": true, "location_query_id": queryId]
         for (key, value) in extras { mergedExtras[key] = value }
 
         return [
             "coords": coords,
-            "timestamp": formatter.string(from: location.timestamp),
+            // Flat aliases for servers that read lat/long at the record root.
+            "latitude": location.coordinate.latitude,
+            "longitude": location.coordinate.longitude,
+            "lat": location.coordinate.latitude,
+            "long": location.coordinate.longitude,
+            "timestamp": Self.iso8601(location.timestamp),
             "is_moving": false,
             "event": "location-push",
             "extras": mergedExtras
         ]
     }
 
+    private static func iso8601(_ date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
+
     private func complete() {
+        socketClient = nil
         completion()
     }
 }

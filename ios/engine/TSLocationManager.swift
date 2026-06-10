@@ -143,6 +143,43 @@ import UIKit
         NSLog("[BGGEO] Synced HTTP config to App Group (url=\(http.url)) for Location Push Extension")
     }
 
+    /// Host-app-supplied delivery config for the Location Push Service Extension.
+    /// Lets the app hand the extension a preferred socket channel (and any extra
+    /// REST overrides). Keys: socketUrl, socketPath, socketEvent, socketAuthToken,
+    /// socketTimeout, url, accessToken, extras. Persisted to the App Group.
+    @objc public func setLocationPushConfig(_ config: [String: Any]) {
+        guard let defaults = TSLocationPushShared.sharedDefaults() else {
+            NSLog("[BGGEO] App Group not configured — Location Push config not stored")
+            return
+        }
+
+        // Partial update: only touch keys PRESENT in the dict. An explicit
+        // NSNull clears; an absent key is left unchanged (so a later
+        // fcmToken-only call doesn't wipe the socket config).
+        func apply(_ defaultsKey: String, _ srcKey: String) {
+            guard let value = config[srcKey] else { return }
+            if value is NSNull { defaults.removeObject(forKey: defaultsKey) }
+            else { defaults.set(value, forKey: defaultsKey) }
+        }
+
+        apply(TSLocationPushShared.keySocketUrl, "socketUrl")
+        apply(TSLocationPushShared.keySocketPath, "socketPath")
+        apply(TSLocationPushShared.keySocketEvent, "socketEvent")
+        apply(TSLocationPushShared.keySocketAuthToken, "socketAuthToken")
+        apply(TSLocationPushShared.keySocketTimeout, "socketTimeout")
+        apply(TSLocationPushShared.keyFallbackUrl, "fallbackUrl")
+        apply(TSLocationPushShared.keyFcmToken, "fcmToken")
+
+        // Optional REST overrides (otherwise the values synced from http config win).
+        if let url = config["url"] { defaults.set(url, forKey: TSLocationPushShared.keyUrl) }
+        if let token = config["accessToken"] { defaults.set(token, forKey: TSLocationPushShared.keyAccessToken) }
+        if let extras = config["extras"] as? [String: Any] {
+            defaults.set(extras, forKey: TSLocationPushShared.keyExtras)
+        }
+
+        NSLog("[BGGEO] Stored Location Push delivery config (socketUrl=\(config["socketUrl"] ?? "nil"))")
+    }
+
     @objc public func start() {
         let config = TSConfig.sharedInstance()
         config.enabled = true
