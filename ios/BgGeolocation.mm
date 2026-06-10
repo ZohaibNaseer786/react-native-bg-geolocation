@@ -168,18 +168,56 @@ RCT_EXPORT_MODULE();
       id queryId          = note.userInfo[@"locationQueryId"] ?: [NSNull null];
 
       TSCurrentPositionRequest *request =
-        [TSCurrentPositionRequest requestWithSuccess:^(id location) {
-          [strongMe sendEventWithName:EVENT_LOCATIONPUSH body:@{
-            @"requestId":       requestId,
-            @"locationQueryId": queryId,
-            @"location":        [(TSLocation *)location toDictionary],
-          }];
+        [TSCurrentPositionRequest requestWithSuccess:^(id locationObj) {
+          TSLocation *tsLocation = (TSLocation *)locationObj;
+          CLLocation *loc = tsLocation.location;
+          NSDictionary *dict = [tsLocation toDictionary];
+
+          // Deliver NATIVELY (socket → REST) so it works even when the RN bridge
+          // isn't alive on a background/kill-state wake. JS is notified after,
+          // with delivered=YES so the host app does NOT re-send.
+          void (^afterDeliver)(BOOL) = ^(BOOL delivered) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+              [strongMe sendEventWithName:EVENT_LOCATIONPUSH body:@{
+                @"requestId":       requestId,
+                @"locationQueryId": queryId,
+                @"location":        dict ?: [NSNull null],
+                @"delivered":       @(delivered),
+              }];
+              // Release the app without depending on JS calling finishLocationPush.
+              [[NSNotificationCenter defaultCenter]
+                  postNotificationName:NOTIF_LOCATIONPUSH_FINISHED
+                                object:nil
+                              userInfo:@{@"requestId": requestId}];
+            });
+          };
+
+          if (loc != nil) {
+            CLLocationCoordinate2D c = loc.coordinate;
+            NSString *ts = [strongMe iso8601StringFromDate:loc.timestamp];
+            [TSLocationPushDeliverer deliverWithLatitude:c.latitude
+                                               longitude:c.longitude
+                                                accuracy:MAX(loc.horizontalAccuracy, 0)
+                                                   speed:loc.speed
+                                                 heading:loc.course
+                                                altitude:loc.altitude
+                                            timestampISO:ts
+                                                 queryId:(queryId == [NSNull null] ? @"" : queryId)
+                                              completion:^(BOOL ok) { afterDeliver(ok); }];
+          } else {
+            afterDeliver(NO);
+          }
         } failure:^(NSInteger code) {
           [strongMe sendEventWithName:EVENT_LOCATIONPUSH body:@{
             @"requestId":       requestId,
             @"locationQueryId": queryId,
             @"error":           @(code),
+            @"delivered":       @(NO),
           }];
+          [[NSNotificationCenter defaultCenter]
+              postNotificationName:NOTIF_LOCATIONPUSH_FINISHED
+                            object:nil
+                          userInfo:@{@"requestId": requestId}];
         }];
       request.timeout         = 20;
       request.samples         = 1;
@@ -567,6 +605,17 @@ RCT_EXPORT_MODULE();
                       failure:(RCTResponseSenderBlock)failure {
   [_engine setLocationPushConfig:(config ?: @{})];
   success(@[]);
+}
+
+- (NSString *)iso8601StringFromDate:(NSDate *)date {
+  static NSISO8601DateFormatter *formatter;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    formatter = [[NSISO8601DateFormatter alloc] init];
+    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime |
+                              NSISO8601DateFormatWithFractionalSeconds;
+  });
+  return [formatter stringFromDate:(date ?: [NSDate date])];
 }
 
 - (void)finishLocationPush:(NSString *)requestId

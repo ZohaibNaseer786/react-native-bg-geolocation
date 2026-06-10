@@ -20,6 +20,17 @@
 //
 
 import Foundation
+import os.log
+
+// Shared logger for all location-push code (extension + in-app). Compiled into
+// both the pod and the extension target via TSLocationPushShared.swift.
+enum TSLocationPushLog {
+    private static let logger = OSLog(subsystem: "com.bggeolocation.locationpush", category: "LocationPush")
+    static func log(_ message: String) {
+        os_log("%{public}@", log: logger, type: .info, message)
+        NSLog("[BGGEO][PushExt] \(message)")
+    }
+}
 
 @objc public final class TSLocationPushShared: NSObject {
 

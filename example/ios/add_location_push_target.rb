@@ -36,7 +36,7 @@ shared_group = project.main_group.find_subpath("LocationPushShared", true)
 shared_group.set_source_tree("SOURCE_ROOT")
 shared_group.set_path("../../ios/locationpush")
 
-%w[TSLocationPushShared.swift TSLocationPushSocketClient.swift TSLocationPushService.swift].each do |name|
+%w[TSLocationPushShared.swift TSLocationPushSocketClient.swift TSLocationPushDeliverer.swift TSLocationPushService.swift].each do |name|
   file = shared_group.files.find { |f| f.path == name } || shared_group.new_file(name)
   unless ext_target.source_build_phase.files_references.include?(file)
     ext_target.source_build_phase.add_file_reference(file)
