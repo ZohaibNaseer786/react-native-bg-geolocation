@@ -20,7 +20,12 @@ Pod::Spec.new do |s|
   # CLLocationPushServiceExtension target. Only the shared constants
   # (TSLocationPushShared.swift) are compiled into the engine so it can write
   # config into the App Group.
-  s.source_files = "ios/**/*.{h,m,mm,cpp}", "ios/engine/**/*.swift", "ios/liveactivity/**/*.swift", "ios/locationpush/TSLocationPushShared.swift"
+  # The location-push extension's PRINCIPAL class (TSLocationPushService.swift)
+  # is excluded from the pod — it belongs only to the
+  # CLLocationPushServiceExtension target. The shared constants, socket client,
+  # and deliverer ARE compiled into the engine so the in-app background-push
+  # handler can deliver natively without React Native.
+  s.source_files = "ios/**/*.{h,m,mm,cpp}", "ios/engine/**/*.swift", "ios/liveactivity/**/*.swift", "ios/locationpush/TSLocationPushShared.swift", "ios/locationpush/TSLocationPushSocketClient.swift", "ios/locationpush/TSLocationPushDeliverer.swift"
 
   s.libraries    = 'sqlite3', 'z', 'stdc++'
   s.frameworks   = "CoreLocation", "CoreMotion", "AVFoundation", "AudioToolbox", "MediaPlayer", "UIKit", "CoreData",

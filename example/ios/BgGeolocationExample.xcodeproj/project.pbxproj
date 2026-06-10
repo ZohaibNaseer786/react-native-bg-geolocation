@@ -23,6 +23,7 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		89585FE00F2B1496681DDAA0 /* TSLocationPushService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A158860F496EA8A0F256088 /* TSLocationPushService.swift */; };
 		896FB9DC7AB61AB92D361AB9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CCA0C942291F5B575D339E24 /* Foundation.framework */; };
+		988640A5941ABBB4B1447C67 /* TSLocationPushDeliverer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D363E27F82C09672F811136 /* TSLocationPushDeliverer.swift */; };
 		9D9E1B92A5043875569B487B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CCA0C942291F5B575D339E24 /* Foundation.framework */; };
 		D09C9BAA8F555FA90FD6D812 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C7948DB36C89FFC42DAD68C /* WidgetKit.framework */; };
 		DB7ADD5637706F43D74373CE /* LocationPushExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BF0887F37AB8EA5AE58EB131 /* LocationPushExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -76,6 +77,7 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BgGeolocationExample/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BgGeolocationExample/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8A158860F496EA8A0F256088 /* TSLocationPushService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLocationPushService.swift; sourceTree = "<group>"; };
+		8D363E27F82C09672F811136 /* TSLocationPushDeliverer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLocationPushDeliverer.swift; sourceTree = "<group>"; };
 		BA47E4B4DF89311EA7114BBF /* LiveTrackingWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveTrackingWidget.swift; sourceTree = "<group>"; };
 		BE70CBD8E7661E64E29A2D71 /* TSLiveTrackingAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSLiveTrackingAttributes.swift; sourceTree = "<group>"; };
 		BF0887F37AB8EA5AE58EB131 /* LocationPushExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LocationPushExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -126,6 +128,7 @@
 				EB1636814E71EE6D88A84F92 /* TSLocationPushShared.swift */,
 				8A158860F496EA8A0F256088 /* TSLocationPushService.swift */,
 				72CDBDAA7420F0B44B6DE0DF /* TSLocationPushSocketClient.swift */,
+				8D363E27F82C09672F811136 /* TSLocationPushDeliverer.swift */,
 			);
 			name = LocationPushShared;
 			path = ../../ios/locationpush;
@@ -458,6 +461,7 @@
 				231714B6D3E532687649BB4C /* TSLocationPushShared.swift in Sources */,
 				89585FE00F2B1496681DDAA0 /* TSLocationPushService.swift in Sources */,
 				0B1D16C77EDC2DAFC730A876 /* TSLocationPushSocketClient.swift in Sources */,
+				988640A5941ABBB4B1447C67 /* TSLocationPushDeliverer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

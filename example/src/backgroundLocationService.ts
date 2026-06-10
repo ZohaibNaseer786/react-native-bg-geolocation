@@ -275,19 +275,23 @@ function registerListeners(): void {
 }
 
 /**
- * Handle a background location push delivered to the live app. The NATIVE SDK
- * already captured the location with our engine and handed it to us here — JS
- * only owns delivery: send over the socket (REST fallback to
- * /api/location/fallback lives inside sendLocationToSocket), then tell native
- * we're done so iOS can release the app.
+ * Background location push. The NATIVE SDK already captured the location AND
+ * delivered it (socket → REST) — that works even on a kill-state wake when the
+ * JS bridge isn't ready. When `delivered` is true, JS must NOT re-send. Native
+ * also fires the completion handler itself. JS sending is only a fallback.
  */
 async function handleBackgroundLocationPush(event: {
   requestId: string;
   locationQueryId?: string;
   location?: Location;
   error?: number;
+  delivered?: boolean;
 }): Promise<void> {
-  log(`📲 background location push (query=${event.locationQueryId ?? '—'})`);
+  log(
+    `📲 background location push (query=${event.locationQueryId ?? '—'} delivered=${event.delivered})`
+  );
+  if (event.delivered) return; // native already sent it
+
   try {
     if (event.location?.coords) {
       await sendLocationUpdate(event.location, { force: true });
@@ -297,7 +301,6 @@ async function handleBackgroundLocationPush(event: {
   } catch (err) {
     log(`background push handler error: ${String(err)}`);
   } finally {
-    // Always release the app, even on error/timeout.
     await BackgroundGeolocation.finishLocationPush(event.requestId).catch(
       () => {}
     );
