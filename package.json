@@ -2,13 +2,18 @@
   "name": "react-native-bg-geolocation",
   "version": "0.2.0",
   "description": "Background geolocation tracking for React Native",
-  "main": "./lib/module/index.js",
-  "types": "./lib/typescript/src/index.d.ts",
+  "main": "./src/index.tsx",
+  "module": "./src/index.tsx",
+  "react-native": "./src/index.tsx",
+  "source": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "comment:entry": "This library is consumed via a GitHub archive tarball, which contains no built lib/ and runs no bob build. All entry points resolve to src so the consumer's Metro/Babel transpiles the source directly — no build step required.",
   "exports": {
     ".": {
       "source": "./src/index.tsx",
-      "types": "./lib/typescript/src/index.d.ts",
-      "default": "./lib/module/index.js"
+      "react-native": "./src/index.tsx",
+      "types": "./src/index.tsx",
+      "default": "./src/index.tsx"
     },
     "./package.json": "./package.json"
   },
