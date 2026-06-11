@@ -17,7 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
   // Background-push completion handlers, keyed by a per-push requestId. JS calls
   // BackgroundGeolocation.finishLocationPush(requestId) when it's done, which
-  // posts TSLocationPushFinished → we invoke + remove the matching handler.
+  // posts BGLocationPushFinished → we invoke + remove the matching handler.
   private var backgroundPushCompletions: [String: (UIBackgroundFetchResult) -> Void] = [:]
 
   func application(
@@ -40,7 +40,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // When JS signals it finished handling a background push, release the app.
     NotificationCenter.default.addObserver(
-      forName: Notification.Name("TSLocationPushFinished"),
+      forName: Notification.Name("BGLocationPushFinished"),
       object: nil,
       queue: .main
     ) { [weak self] note in
@@ -138,7 +138,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     NSLog("[BGGEO] background push → JS (requestId=\(requestId), query=\(queryId))")
 
     NotificationCenter.default.post(
-      name: Notification.Name("TSLocationPushBackground"),
+      name: Notification.Name("BGLocationPushBackground"),
       object: nil,
       userInfo: ["requestId": requestId, "locationQueryId": queryId]
     )

@@ -34,8 +34,8 @@ end
 shared_group = project.main_group.find_subpath("LiveActivityShared", true)
 shared_group.set_source_tree("SOURCE_ROOT")
 shared_group.set_path("../../ios/liveactivity")
-attributes_file = shared_group.files.find { |item| item.path == "TSLiveTrackingAttributes.swift" } ||
-  shared_group.new_file("TSLiveTrackingAttributes.swift")
+attributes_file = shared_group.files.find { |item| item.path == "BGLiveTrackingAttributes.swift" } ||
+  shared_group.new_file("BGLiveTrackingAttributes.swift")
 unless extension_target.source_build_phase.files_references.include?(attributes_file)
   extension_target.source_build_phase.add_file_reference(attributes_file)
 end

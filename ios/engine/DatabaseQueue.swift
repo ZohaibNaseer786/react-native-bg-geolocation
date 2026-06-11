@@ -23,7 +23,7 @@ import Foundation
 
     private func databasePath() -> String {
         let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first!
-        return (docs as NSString).appendingPathComponent("TSDatabase.db")
+        return (docs as NSString).appendingPathComponent("BGDatabase.db")
     }
 
     private func openDatabase() {

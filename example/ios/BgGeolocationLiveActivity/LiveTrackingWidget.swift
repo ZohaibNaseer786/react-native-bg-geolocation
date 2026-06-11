@@ -4,7 +4,7 @@ import WidgetKit
 
 struct LiveTrackingWidget: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: TSLiveTrackingAttributes.self) { context in
+        ActivityConfiguration(for: BGLiveTrackingAttributes.self) { context in
             LiveTrackingLockScreenView(context: context)
                 .activityBackgroundTint(Color(red: 0.055, green: 0.075, blue: 0.09))
                 .activitySystemActionForegroundColor(.white)
@@ -69,7 +69,7 @@ struct LiveTrackingWidget: Widget {
 }
 
 private struct LiveTrackingLockScreenView: View {
-    let context: ActivityViewContext<TSLiveTrackingAttributes>
+    let context: ActivityViewContext<BGLiveTrackingAttributes>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -157,13 +157,13 @@ private struct MetricView: View {
 }
 
 private func trackingStatus(
-    _ context: ActivityViewContext<TSLiveTrackingAttributes>
+    _ context: ActivityViewContext<BGLiveTrackingAttributes>
 ) -> String {
     context.isStale ? "Updates paused" : context.state.status
 }
 
 private func trackingSymbol(
-    _ context: ActivityViewContext<TSLiveTrackingAttributes>
+    _ context: ActivityViewContext<BGLiveTrackingAttributes>
 ) -> String {
     if context.isStale {
         return "exclamationmark.triangle.fill"
@@ -174,7 +174,7 @@ private func trackingSymbol(
 }
 
 private func trackingColor(
-    _ context: ActivityViewContext<TSLiveTrackingAttributes>
+    _ context: ActivityViewContext<BGLiveTrackingAttributes>
 ) -> Color {
     if context.isStale {
         return .orange

@@ -28,7 +28,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.location.push.service</string>
 		<key>NSExtensionPrincipalClass</key>
-		<string>TSLocationPushService</string>
+		<string>BGLocationPushService</string>
 	</dict>
 	<key>RCTNewArchEnabled</key>
 	<true/>

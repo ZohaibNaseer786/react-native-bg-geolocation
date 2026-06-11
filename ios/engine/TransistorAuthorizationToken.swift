@@ -58,7 +58,7 @@ import UIKit
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 60.0
 
-        let deviceInfo = TSDeviceInfo.sharedInstance
+        let deviceInfo = BGDeviceInfo.sharedInstance
         let body: [String: Any] = [
             "org": org,
             "device": [

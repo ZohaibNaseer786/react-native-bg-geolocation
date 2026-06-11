@@ -1,6 +1,6 @@
 # react-native-bg-geolocation
 
-Background geolocation tracking for React Native in foreground, background, Android kill state, and eligible iOS OS-managed relaunches, with motion detection (moving/stationary), geofencing, and pluggable delivery (socket / HTTP / headless).
+Background geolocation tracking for React Native in foreground, background, Android kill state, and iOS kill state (server-triggered via the Location Push Service Extension, plus eligible OS-managed relaunches), with motion detection (moving/stationary), geofencing, and pluggable delivery (socket / HTTP / headless).
 
 > Educational re-implementation of the `react-native-background-geolocation` API using only public platform APIs (FusedLocationProvider + Activity Recognition on Android, CoreLocation + CoreMotion + BGTaskScheduler on iOS). No proprietary binaries.
 
@@ -9,8 +9,10 @@ Background geolocation tracking for React Native in foreground, background, Andr
 - ✅ Foreground / background location tracking with OS relaunch-capable events
 - ✅ Moving ↔ stationary detection (motion state machine + activity recognition)
 - ✅ OS-owned delivery (Android PendingIntent, iOS significant-change + regions)
+- ✅ **iOS Location Push Service Extension** — server-triggered location even when the app is force-quit (APNs `location` push → extension captures + uploads natively)
 - ✅ iOS Live Activity for Lock Screen and Dynamic Island tracking status
 - ✅ Headless JS task (Android) for kill-state JS execution
+- ✅ Pluggable delivery: native socket (Socket.IO) → REST fallback, or your own JS handler
 - ✅ Geofencing (`CLCircularRegion` / `GeofencingClient`)
 - ✅ Reboot persistence
 - ✅ Same API shape as `react-native-background-geolocation` (`AuthorizationStatus`, `DesiredAccuracy`, nested `Config`, etc.)
@@ -41,12 +43,18 @@ Add to `Info.plist`:
   <string>audio</string>
   <string>fetch</string>
   <string>processing</string>
+  <!-- Required for the app-alive background push path (Location Push). -->
+  <string>remote-notification</string>
 </array>
 <key>BGTaskSchedulerPermittedIdentifiers</key>
 <array>
   <string>com.bggeolocation.location-refresh</string>
 </array>
 ```
+
+For the Location Push Service Extension (kill-state), the app and extension also
+need the `aps-environment` and `com.apple.developer.location.push` entitlements
+and a shared App Group — see [iOS Location Push Service Extension](#ios-location-push-service-extension-kill-state-tracking).
 
 Register the BGTask in `AppDelegate` (see the example app's `AppDelegate.swift`).
 
@@ -93,6 +101,119 @@ for an audio use case and distribution model Apple has approved. Explicitly
 swiping the app away still terminates audio and location execution.
 Runtime status is available from
 `(await BackgroundGeolocation.getState()).trackingAudio`.
+
+#### iOS Location Push Service Extension (kill-state tracking)
+
+This is the production mechanism for getting a location from a **force-quit**
+app. Your server sends an APNs push to the device's *location-push token*; iOS
+launches a tiny `CLLocationPushServiceExtension` (a **separate process**, no
+React Native), which grabs one fix and uploads it — then the app is left
+untouched. This is how rideshare / delivery apps keep tracking after the user
+swipes the app away.
+
+> **There is no JavaScript in the extension process.** Delivery from a push is
+> done **natively** by the SDK (Socket.IO → REST fallback), because on a
+> kill-state / background wake the RN bridge is not running and JS event
+> listeners would be dropped.
+
+**Two push types, two paths** (your server may send either/both; the device
+uses whichever fires):
+
+| App state | Push to send | Wakes | Who delivers |
+|---|---|---|---|
+| Alive (fg / backgrounded) | `apns-push-type: background`, `content-available: 1` (standard APNs token) | the app | SDK natively, then fires the `locationpush` JS event for awareness |
+| **Force-quit** | `apns-push-type: location` to `<bundle-id>.location-query` (location-push token) | the **extension** | SDK natively inside the extension |
+
+The push payload must carry a `location-query` id (any of `location-query`,
+`locationQuery`, `location_query`, `locationQueryId`, `queryId`). Its presence
+means "report a location now"; it is echoed back in the upload so the server can
+correlate.
+
+**1. Request the Apple entitlement** (one-time, ~24–48h):
+<https://developer.apple.com/contact/request/location-push-service-extension>.
+Once approved, add `com.apple.developer.location.push` to the app entitlements.
+
+**2. Add an App Group** shared by the app and the extension (e.g.
+`group.<your-bundle-id>`). The SDK writes its delivery config into this suite so
+the separate-process extension can read where/how to upload.
+
+**3. Add a Location Push Service Extension target** whose principal class is the
+SDK's `TSLocationPushService`. The example app ships a ready-made target and a
+script that wires it (`example/ios/add_location_push_target.rb`) — copy that
+target, or run the equivalent for your project. The extension's `Info.plist`:
+
+```xml
+<key>NSExtension</key>
+<dict>
+  <key>NSExtensionPointIdentifier</key>
+  <string>com.apple.location.push.service</string>
+  <key>NSExtensionPrincipalClass</key>
+  <string>TSLocationPushService</string>
+</dict>
+```
+
+**4. Register the location-push token in `AppDelegate`** and ship it to your
+server:
+
+```swift
+import CoreLocation
+// keep a strong ref or the manager is deallocated before the callback
+private var locationPushManager: CLLocationManager?
+
+if #available(iOS 15.0, *) {
+  let mgr = CLLocationManager()
+  locationPushManager = mgr
+  mgr.startMonitoringLocationPushes { tokenData, error in
+    guard let data = tokenData else { return }
+    let token = data.map { String(format: "%02hhx", $0) }.joined()
+    UserDefaults.standard.set(token, forKey: "TSLocationManager_locationPushToken")
+  }
+}
+```
+
+Then in JS, after `ready()`:
+
+```ts
+const token = await BackgroundGeolocation.getLocationPushToken(); // iOS only, else null
+if (token) await myApi.registerLocationPushToken(token); // your endpoint
+```
+
+**5. Configure delivery** (where the extension uploads). Call once after
+`ready()`:
+
+```ts
+await BackgroundGeolocation.setLocationPushConfig({
+  socketUrl: 'https://your.server',     // Socket.IO base URL (tried first)
+  socketPath: '/socket/location',
+  socketEvent: 'location:update',
+  socketAuthToken: jwt,                  // sent in the socket CONNECT auth + REST Bearer
+  socketTimeout: 8,                      // seconds before falling back to REST
+  fallbackUrl: 'https://your.server/api/location/fallback',
+  fcmToken,                              // included in the REST fallback body
+});
+```
+
+The native deliverer tries the socket first, then `POST fallbackUrl` with
+`Authorization: Bearer <socketAuthToken>` and body
+`{ latitude, longitude, fcmToken, userCurrentTime, location_query_id }`.
+
+**6. App-alive handler (optional).** When the app is alive, the SDK still
+delivers natively and emits a `locationpush` event so your JS can react. The
+event carries `delivered: true` when native already sent it — **do not re-send**:
+
+```ts
+BackgroundGeolocation.onLocationPush(async (event) => {
+  if (event.delivered) return; // native already uploaded it
+  // fallback: deliver event.location yourself, then:
+  await BackgroundGeolocation.finishLocationPush(event.requestId);
+});
+```
+
+**7. Server.** Send `apns-push-type: location` to the location-push token with
+topic `<bundle-id>.location-query` (and/or a `background` push to the standard
+APNs token for the app-alive path). Requires "Always" location authorization.
+
+Set `app.locationPushEnabled: true` in your config to signal this flow is in use.
 
 ### Android
 
@@ -171,7 +292,8 @@ BackgroundGeolocation.registerHeadlessTask(headlessTask);
 | Platform | Mechanism |
 |---|---|
 | **Android** | A FusedLocation `PendingIntent` is owned by the OS and delivered to a `BroadcastReceiver` even when the process is dead. A `START_STICKY` foreground service keeps the process priority high; `onTaskRemoved` reschedules it via `AlarmManager`. Kill-state events fire the **HeadlessJsTask**, where your JS runs. |
-| **iOS** | Continuous background updates use Core Location. Significant-change and region events can relaunch an app that the system terminated. Each native fix is persisted before upload, and interrupted HTTP delivery is retried on the next native wake or launch. A Live Activity displays native tracking state and can receive server updates through ActivityKit APNs. If the person explicitly force-quits the app, iOS prevents Core Location relaunch until the app is opened again. |
+| **iOS (OS relaunch)** | Continuous background updates use Core Location. Significant-change and region events can relaunch an app the system terminated. Each native fix is persisted before upload; interrupted HTTP delivery retries on the next wake. After an explicit force-quit, iOS will **not** relaunch via Core Location until the app is reopened. |
+| **iOS (force-quit, push-driven)** | Your server sends an APNs `location` push (topic `<bundle-id>.location-query`) to the device's location-push token. iOS launches the **Location Push Service Extension** — a separate process, even when the app is force-quit — which captures one fix and uploads it natively (Socket.IO → REST fallback). See the [Location Push section](#ios-location-push-service-extension-kill-state-tracking). Requires the Apple `location.push` entitlement, an App Group, and "Always" authorization. |
 
 Live Activities do not collect location and do not provide unrestricted
 background execution. Their extension cannot access the network or receive
@@ -191,7 +313,8 @@ on the Lock Screen rather than persistently in the status bar.
 - **Permissions:** `requestPermission`, `requestTemporaryFullAccuracy`, `getProviderState`
 - **Persistence:** `getLocations`, `getCount`, `destroyLocations`, `insertLocation`, `sync`
 - **Geofencing:** `addGeofence(s)`, `removeGeofence(s)`, `getGeofences`, `getGeofence`, `geofenceExists`
-- **Events:** `onLocation`, `onMotionChange`, `onActivityChange`, `onHeartbeat`, `onProviderChange`, `onGeofence`, `onEnabledChange`, `onHttp`, …
+- **Events:** `onLocation`, `onMotionChange`, `onActivityChange`, `onHeartbeat`, `onProviderChange`, `onGeofence`, `onEnabledChange`, `onHttp`, `onLocationPush`, …
+- **iOS Location Push (kill-state):** `getLocationPushToken`, `getApnsDeviceToken`, `setLocationPushConfig`, `onLocationPush`, `finishLocationPush` — all iOS-only (resolve `null` / no-op on Android)
 - **Enums:** `AuthorizationStatus`, `DesiredAccuracy`, `LogLevel`, `NotificationPriority`, `ActivityType`, `PersistMode`, `AccuracyAuthorization`
 
 ## Example
