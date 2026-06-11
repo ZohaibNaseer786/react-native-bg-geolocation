@@ -189,12 +189,31 @@ await BackgroundGeolocation.setLocationPushConfig({
   socketAuthToken: jwt,                  // sent in the socket CONNECT auth + REST Bearer
   socketTimeout: 8,                      // seconds before falling back to REST
   fallbackUrl: 'https://your.server/api/location/fallback',
-  fcmToken,                              // included in the REST fallback body
+  fcmToken,                              // available as the {fcmToken} token
+  // Custom HTTP headers for the REST fallback.
+  headers: { 'Device-Type': 'ios' },
+  // OPTIONAL: define the exact upload shape (socket emit + REST fallback).
+  // Values may contain {tokens} the SDK substitutes with live values. Omit to
+  // use the built-in default body.
+  payloadTemplate: {
+    lat: '{latitude}',                   // exact single token → stays numeric
+    long: '{longitude}',
+    fcm_token: '{fcmToken}',
+    device_type: 'ios',                  // literal value, passed through
+    user_current_time: '{userCurrentTime}',
+    location_query_id: '{queryId}',
+  },
 });
 ```
 
-The native deliverer tries the socket first, then `POST fallbackUrl` with
-`Authorization: Bearer <socketAuthToken>` and body
+**`payloadTemplate`** lets you ship any payload shape from JS — no native
+patching. Tokens (use inside string values): `{latitude}`/`{lat}`,
+`{longitude}`/`{long}`, `{accuracy}`, `{speed}`, `{heading}`, `{altitude}`,
+`{timestamp}`, `{fcmToken}`, `{queryId}`, `{userCurrentTime}` (local `HH:mm`),
+`{deviceType}`. A value that is exactly one token (`'{latitude}'`) keeps its
+native type (numbers stay numbers); inline tokens (`'v2-{queryId}'`) interpolate
+as strings; nested objects/arrays are supported. Without `payloadTemplate` the
+deliverer posts the default body
 `{ latitude, longitude, fcmToken, userCurrentTime, location_query_id }`.
 
 **6. App-alive handler (optional).** When the app is alive, the SDK still

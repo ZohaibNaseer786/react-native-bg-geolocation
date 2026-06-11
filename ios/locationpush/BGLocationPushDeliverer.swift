@@ -88,7 +88,7 @@ private final class BGLocationPushDeliveryJob {
                 url: socketUrl, path: path, event: event, authToken: token, timeout: timeout
             ))
             socketClient = client
-            client.emit(socketPayload()) { [weak self] ok in
+            client.emit(payload(defaults: defaults, default: socketPayload())) { [weak self] ok in
                 guard let self = self else { return }
                 if ok {
                     BGLocationPushLog.log("✅ delivered via socket")
@@ -115,13 +115,14 @@ private final class BGLocationPushDeliveryJob {
         if let fallbackString = defaults.string(forKey: BGLocationPushShared.keyFallbackUrl),
            !fallbackString.isEmpty, let fallbackUrl = URL(string: fallbackString) {
             url = fallbackUrl
-            body = [
+            let defaultBody: [String: Any] = [
                 "latitude": latitude,
                 "longitude": longitude,
                 "fcmToken": defaults.string(forKey: BGLocationPushShared.keyFcmToken) ?? "",
                 "userCurrentTime": BGLocationPushDeliverer.currentTimeHHmm(),
                 "location_query_id": queryId
             ]
+            body = payload(defaults: defaults, default: defaultBody)
             BGLocationPushLog.log("REST fallback → \(fallbackString)")
         } else {
             let urlString = defaults.string(forKey: BGLocationPushShared.keyUrl) ?? ""
@@ -164,6 +165,63 @@ private final class BGLocationPushDeliveryJob {
                 self?.finish(false)
             }
         }.resume()
+    }
+
+    /// Resolve the upload body: if the host supplied a `payloadTemplate` via
+    /// setLocationPushConfig, render it (substituting {tokens} with live values);
+    /// otherwise use the built-in `default` payload.
+    private func payload(defaults: UserDefaults, default fallback: [String: Any]) -> [String: Any] {
+        guard let template = defaults.dictionary(forKey: BGLocationPushShared.keyPayloadTemplate) else {
+            return fallback
+        }
+        return (render(template) as? [String: Any]) ?? fallback
+    }
+
+    /// Live values that template tokens like "{latitude}" / "{fcmToken}" map to.
+    private func tokenValues() -> [String: Any] {
+        let fcm = BGLocationPushShared.sharedDefaults()?
+            .string(forKey: BGLocationPushShared.keyFcmToken) ?? ""
+        let time = BGLocationPushDeliverer.currentTimeHHmm()
+        return [
+            "latitude": latitude, "lat": latitude,
+            "longitude": longitude, "long": longitude,
+            "accuracy": max(accuracy, 0),
+            "speed": speed, "heading": heading, "altitude": altitude,
+            "timestamp": timestampISO,
+            "fcmToken": fcm, "fcm_token": fcm,
+            "queryId": queryId, "locationQueryId": queryId, "location_query_id": queryId,
+            "userCurrentTime": time, "user_current_time": time, "time": time,
+            "deviceType": "ios", "device_type": "ios"
+        ]
+    }
+
+    /// Recursively substitute tokens in a template value. A string that is exactly
+    /// one token ("{latitude}") yields the typed value (Double/String); a string
+    /// with inline tokens is interpolated; dicts/arrays recurse; other values pass
+    /// through unchanged.
+    private func render(_ value: Any) -> Any {
+        let tokens = tokenValues()
+        if let dict = value as? [String: Any] {
+            var out: [String: Any] = [:]
+            for (k, v) in dict { out[k] = render(v) }
+            return out
+        }
+        if let arr = value as? [Any] {
+            return arr.map { render($0) }
+        }
+        if let s = value as? String {
+            if s.hasPrefix("{"), s.hasSuffix("}"),
+               !s.dropFirst().dropLast().contains("{"),
+               let typed = tokens[String(s.dropFirst().dropLast())] {
+                return typed // exact single-token → typed value (keeps numbers numeric)
+            }
+            var result = s
+            for (name, val) in tokens {
+                result = result.replacingOccurrences(of: "{\(name)}", with: "\(val)")
+            }
+            return result
+        }
+        return value
     }
 
     private func socketPayload() -> [String: Any] {

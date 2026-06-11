@@ -197,6 +197,17 @@ import UIKit
         if let extras = config["extras"] as? [String: Any] {
             defaults.set(extras, forKey: BGLocationPushShared.keyExtras)
         }
+        // Custom HTTP headers for the REST fallback (e.g. {"Device-Type": "ios"}).
+        if let headers = config["headers"] as? [String: String] {
+            defaults.set(headers, forKey: BGLocationPushShared.keyHeaders)
+        }
+        // Host-defined payload shape (applies to socket emit + REST fallback).
+        // Pass NSNull / omit to keep the built-in default payload.
+        if let template = config["payloadTemplate"] as? [String: Any] {
+            defaults.set(template, forKey: BGLocationPushShared.keyPayloadTemplate)
+        } else if config["payloadTemplate"] is NSNull {
+            defaults.removeObject(forKey: BGLocationPushShared.keyPayloadTemplate)
+        }
 
         NSLog("[BGGEO] Stored Location Push delivery config (socketUrl=\(config["socketUrl"] ?? "nil"))")
     }

@@ -63,6 +63,12 @@ enum BGLocationPushLog {
     public static let keyFallbackUrl     = "BGLocationPush_fallbackUrl"
     public static let keyFcmToken        = "BGLocationPush_fcmToken"
 
+    // Host-defined payload shape for the upload (socket + REST fallback). A dict
+    // whose values may contain tokens like "{latitude}", "{fcmToken}",
+    // "{userCurrentTime}" that the deliverer substitutes with live values. When
+    // absent, the deliverer uses its built-in default payload.
+    public static let keyPayloadTemplate = "BGLocationPush_payloadTemplate"
+
     // The location push token (hex) the host app obtained from
     // `startMonitoringLocationPushesWithCompletion`. Stored in BOTH the standard
     // and the shared suite so JS can read it via getLocationPushToken().
