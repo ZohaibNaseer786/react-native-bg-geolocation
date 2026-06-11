@@ -162,7 +162,7 @@ import CoreLocation
 
     private static var _sharedInstance: BGConfigOLD?
     private static let instanceLock = NSLock()
-    private static let storageKey = "TSLocationManager_config_v2"
+    private static let storageKey = "BGLocationManager_config_v2"
 
     @objc public class func sharedInstance() -> BGConfigOLD {
         instanceLock.lock()
@@ -511,11 +511,11 @@ import CoreLocation
     }
 
     @objc public func isFirstBoot() -> Bool {
-        return !UserDefaults.standard.bool(forKey: "TSLocationManager_booted")
+        return !UserDefaults.standard.bool(forKey: "BGLocationManager_booted")
     }
 
     @objc public func didDeviceReboot() -> Bool {
-        let stored = UserDefaults.standard.double(forKey: "TSLocationManager_uptime")
+        let stored = UserDefaults.standard.double(forKey: "BGLocationManager_uptime")
         return stored > ProcessInfo.processInfo.systemUptime
     }
 

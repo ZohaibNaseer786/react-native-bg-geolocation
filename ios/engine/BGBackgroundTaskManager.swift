@@ -68,7 +68,7 @@ import CoreLocation
         // region wake, not from background tasks — this only bridges short gaps
         // (e.g. so a heartbeat tick can complete an HTTP flush).
         DispatchQueue.main.async {
-            let id = UIApplication.shared.beginBackgroundTask(withName: "TSPreventSuspend") { [weak self] in
+            let id = UIApplication.shared.beginBackgroundTask(withName: "BGPreventSuspend") { [weak self] in
                 self?.stopAllPreventSuspend()
             }
             if id != .invalid {
@@ -82,7 +82,7 @@ import CoreLocation
         // execution window rolls forward without a gap. Driven from the heartbeat.
         DispatchQueue.main.async {
             let previous = self.preventSuspendTasks
-            let id = UIApplication.shared.beginBackgroundTask(withName: "TSPreventSuspend") { [weak self] in
+            let id = UIApplication.shared.beginBackgroundTask(withName: "BGPreventSuspend") { [weak self] in
                 self?.stopAllPreventSuspend()
             }
             if id != .invalid {

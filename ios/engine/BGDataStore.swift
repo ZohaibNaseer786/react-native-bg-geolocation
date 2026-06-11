@@ -55,7 +55,7 @@ import CoreLocation
     }
 
     @objc public func loadLastOdometerLocation() {
-        if let data = UserDefaults.standard.data(forKey: "TSLastOdometerLocation"),
+        if let data = UserDefaults.standard.data(forKey: "BGLastOdometerLocation"),
            let loc = try? NSKeyedUnarchiver.unarchivedObject(ofClass: CLLocation.self, from: data) {
             lastOdometerLocation = loc
         }
@@ -64,12 +64,12 @@ import CoreLocation
     @objc public func persistLastOdometerLocation(_ location: CLLocation) {
         lastOdometerLocation = location
         if let data = try? NSKeyedArchiver.archivedData(withRootObject: location, requiringSecureCoding: true) {
-            UserDefaults.standard.set(data, forKey: "TSLastOdometerLocation")
+            UserDefaults.standard.set(data, forKey: "BGLastOdometerLocation")
         }
     }
 
     @objc public func clearLastOdometerLocation() {
         lastOdometerLocation = nil
-        UserDefaults.standard.removeObject(forKey: "TSLastOdometerLocation")
+        UserDefaults.standard.removeObject(forKey: "BGLastOdometerLocation")
     }
 }

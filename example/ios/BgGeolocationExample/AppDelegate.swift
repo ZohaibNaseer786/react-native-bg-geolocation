@@ -25,7 +25,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     if launchOptions?[.location] != nil || application.applicationState == .background {
-      UserDefaults.standard.set(true, forKey: "TSLocationManager_didLaunchInBackground")
+      UserDefaults.standard.set(true, forKey: "BGLocationManager_didLaunchInBackground")
       UserDefaults.standard.synchronize()
     }
 
@@ -89,10 +89,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       NSLog("[BGGEO] ✅ Location push token: \(token)")
 
       // Standard suite — JS reads via BackgroundGeolocation.getLocationPushToken().
-      UserDefaults.standard.set(token, forKey: "TSLocationManager_locationPushToken")
+      UserDefaults.standard.set(token, forKey: "BGLocationManager_locationPushToken")
       // Shared suite — available to the extension if needed.
       UserDefaults(suiteName: "group.com.masjidpilot.staging")?
-        .set(token, forKey: "TSLocationManager_locationPushToken")
+        .set(token, forKey: "BGLocationManager_locationPushToken")
     }
   }
 
@@ -104,7 +104,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   ) {
     let token = deviceToken.map { String(format: "%02hhx", $0) }.joined()
     NSLog("[BGGEO] ✅ APNs device token: \(token)")
-    UserDefaults.standard.set(token, forKey: "TSLocationManager_apnsDeviceToken")
+    UserDefaults.standard.set(token, forKey: "BGLocationManager_apnsDeviceToken")
     // The JS layer ships this to the server (see registerApnsDeviceToken()).
   }
 

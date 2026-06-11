@@ -241,7 +241,7 @@ import UIKit
         // motion stop/start `stationaryRadius` distance logic).
         let minReliableRadius: CLLocationDistance = 200.0
         let effectiveRadius = max(radius, minReliableRadius)
-        let region = CLCircularRegion(center: location.coordinate, radius: effectiveRadius, identifier: "TSStationary")
+        let region = CLCircularRegion(center: location.coordinate, radius: effectiveRadius, identifier: "BGStationary")
         region.notifyOnExit = true
         stationaryRegion = region
         _mutateCL { mgr in
@@ -488,7 +488,7 @@ import UIKit
         let tsLocation = BGLocation(location: location, type: "stationary", extras: nil)
         _ = BGLocationDAO.sharedInstance().create(tsLocation, error: nil)
         stationaryLocation = location
-        UserDefaults.standard.set(try? JSONSerialization.data(withJSONObject: tsLocation.toDictionary()), forKey: "TSLocationManager_stationary")
+        UserDefaults.standard.set(try? JSONSerialization.data(withJSONObject: tsLocation.toDictionary()), forKey: "BGLocationManager_stationary")
         if BGConfig.sharedInstance().http.autoSync && BGConfig.sharedInstance().http.hasValidUrl {
             let http = BGHttpService.sharedInstance()
             if isInBackground() || BGAppState.sharedInstance().didLaunchInBackground {
@@ -500,14 +500,14 @@ import UIKit
     }
 
     @objc public func loadStationaryLocation() {
-        if let data = UserDefaults.standard.data(forKey: "TSLocationManager_stationary"),
+        if let data = UserDefaults.standard.data(forKey: "BGLocationManager_stationary"),
            let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             stationaryLocation = BGLocationDAO.sharedInstance().inflate(dict).location
         }
     }
 
     @objc public func destroyStationaryLocation() {
-        UserDefaults.standard.removeObject(forKey: "TSLocationManager_stationary")
+        UserDefaults.standard.removeObject(forKey: "BGLocationManager_stationary")
         stationaryLocation = nil
     }
 
@@ -737,7 +737,7 @@ import UIKit
                 isMonitoringSignificantLocationChanges = true
                 if let loc = stationaryLocation ?? lastGoodLocation {
                     let radius = max(config.geolocation.stationaryRadius, 200.0)
-                    let region = CLCircularRegion(center: loc.coordinate, radius: radius, identifier: "TSStationary")
+                    let region = CLCircularRegion(center: loc.coordinate, radius: radius, identifier: "BGStationary")
                     region.notifyOnExit = true
                     stationaryRegion = region
                     mgr.startMonitoring(for: region)
@@ -848,7 +848,9 @@ import UIKit
     }
 
     @objc public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        guard region.identifier == "TSStationary" else { return }
+        // Accept the legacy "TSStationary" id for regions iOS was already
+        // monitoring before the TS* → BG* rename (self-heals on next ready()).
+        guard region.identifier == "BGStationary" || region.identifier == "TSStationary" else { return }
         if !isMoving {
             startUpdatingLocation()
             let fallback: CLLocation

@@ -590,13 +590,13 @@ RCT_EXPORT_MODULE();
 
 - (void)getLocationPushToken:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   NSString *token = [[NSUserDefaults standardUserDefaults]
-                     stringForKey:@"TSLocationManager_locationPushToken"];
+                     stringForKey:@"BGLocationManager_locationPushToken"];
   success(@[token ?: [NSNull null]]);
 }
 
 - (void)getApnsDeviceToken:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   NSString *token = [[NSUserDefaults standardUserDefaults]
-                     stringForKey:@"TSLocationManager_apnsDeviceToken"];
+                     stringForKey:@"BGLocationManager_apnsDeviceToken"];
   success(@[token ?: [NSNull null]]);
 }
 
@@ -674,7 +674,7 @@ RCT_EXPORT_MODULE();
         [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
     if (launchedForLocation || inBackground) {
       [[NSUserDefaults standardUserDefaults] setBool:YES
-                                              forKey:@"TSLocationManager_didLaunchInBackground"];
+                                              forKey:@"BGLocationManager_didLaunchInBackground"];
       [[NSUserDefaults standardUserDefaults] synchronize];
     }
     // Diagnostic marker — visible in the iOS unified log (`log show` /

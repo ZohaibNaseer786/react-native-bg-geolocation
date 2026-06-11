@@ -75,7 +75,7 @@ import CoreLocation
     }
 
     @objc public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        // "TSStationary" -> tracking (start-detection); "BGGeofence:" -> geofences.
+        // "BGStationary" -> tracking (start-detection); "BGGeofence:" -> geofences.
         tracking.locationManager(manager, didExitRegion: region)
         geofences.locationManager(manager, didExitRegion: region)
     }

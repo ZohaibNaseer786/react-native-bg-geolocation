@@ -8,7 +8,7 @@ import CoreLocation
 
     @objc public var value: Double = 0
     private var lastLocation: CLLocation?
-    private let userDefaultsKey = "TSLocationManager_odometer"
+    private let userDefaultsKey = "BGLocationManager_odometer"
 
     @objc public class func sharedInstance() -> BGOdometer {
         lock.lock()

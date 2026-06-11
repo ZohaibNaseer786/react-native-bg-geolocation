@@ -7,9 +7,9 @@ import ActivityKit
 #endif
 
 @objc public final class BGLiveActivityManager: NSObject {
-    private static let tokenDefaultsKey = "TSLocationManager_liveActivityPushToken"
-    private static let idDefaultsKey = "TSLocationManager_liveActivityId"
-    private static let trackingIdDefaultsKey = "TSLocationManager_liveActivityTrackingId"
+    private static let tokenDefaultsKey = "BGLocationManager_liveActivityPushToken"
+    private static let idDefaultsKey = "BGLocationManager_liveActivityId"
+    private static let trackingIdDefaultsKey = "BGLocationManager_liveActivityTrackingId"
 
     @objc public static let shared = BGLiveActivityManager()
 

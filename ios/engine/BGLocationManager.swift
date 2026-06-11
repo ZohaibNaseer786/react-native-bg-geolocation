@@ -26,7 +26,28 @@ import UIKit
 
     @objc public override init() {
         super.init()
+        BGLocationManager.migrateLegacyKeysIfNeeded()
         setupCoreLocation()
+    }
+
+    /// One-time migration after the TS* → BG* rename. Copies any values still
+    /// stored under the old `TSLocationManager_*` / `TSLocationPush_*` keys to
+    /// their new `BG*` names, in both the standard suite and the App Group, so
+    /// already-issued location-push tokens, odometer, and config survive the
+    /// upgrade. Idempotent and cheap; runs once then no-ops.
+    @objc public static func migrateLegacyKeysIfNeeded() {
+        let suites: [UserDefaults?] = [.standard, BGLocationPushShared.sharedDefaults()]
+        for case let defaults? in suites {
+            guard !defaults.bool(forKey: "BGLocationManager_keysMigrated") else { continue }
+            for (key, value) in defaults.dictionaryRepresentation() {
+                guard key.hasPrefix("TSLocationManager_") || key.hasPrefix("TSLocationPush_") else { continue }
+                let newKey = "BG" + key.dropFirst(2) // TS… -> BG…
+                if defaults.object(forKey: newKey) == nil {
+                    defaults.set(value, forKey: newKey)
+                }
+            }
+            defaults.set(true, forKey: "BGLocationManager_keysMigrated")
+        }
     }
 
     private func setupCoreLocation() {
@@ -81,7 +102,7 @@ import UIKit
         isReady = true
         let config = BGConfig.sharedInstance()
         // Mark the app as having booted at least once so isFirstBoot() returns false on next launch.
-        UserDefaults.standard.set(true, forKey: "TSLocationManager_booted")
+        UserDefaults.standard.set(true, forKey: "BGLocationManager_booted")
         BGLog.sharedInstance().configure()
         BGHttpService.sharedInstance().startMonitoring()
         BGLocationDAO.sharedInstance()
@@ -105,7 +126,7 @@ import UIKit
         // into config — otherwise (when ready() runs via the cfg.enabled branch
         // instead of startOnBoot) the flag leaks into the NEXT normal foreground
         // launch, corrupting launch classification.
-        UserDefaults.standard.removeObject(forKey: "TSLocationManager_didLaunchInBackground")
+        UserDefaults.standard.removeObject(forKey: "BGLocationManager_didLaunchInBackground")
 
         // Mirror the HTTP config into the App Group so the Location Push Service
         // Extension can POST locations to the same server while the app is killed.

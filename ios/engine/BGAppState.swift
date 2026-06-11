@@ -36,7 +36,7 @@ import CoreLocation
         super.init()
         launchTimestamp = Date()
         isInBackground = UIApplication.shared.applicationState == .background
-        didLaunchInBackground = isInBackground || UserDefaults.standard.bool(forKey: "TSLocationManager_didLaunchInBackground")
+        didLaunchInBackground = isInBackground || UserDefaults.standard.bool(forKey: "BGLocationManager_didLaunchInBackground")
         setupNotifications()
     }
 

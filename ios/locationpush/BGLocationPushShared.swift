@@ -39,34 +39,34 @@ enum BGLocationPushLog {
     public static let defaultAppGroupIdentifier = "group.com.masjidpilot.staging"
 
     // UserDefaults keys written by the host app and read by the extension.
-    public static let keyAppGroup       = "TSLocationPush_appGroup"
-    public static let keyUrl            = "TSLocationPush_url"
-    public static let keyMethod         = "TSLocationPush_method"
-    public static let keyHeaders        = "TSLocationPush_headers"
-    public static let keyParams         = "TSLocationPush_params"
-    public static let keyExtras         = "TSLocationPush_extras"
-    public static let keyRootProperty   = "TSLocationPush_rootProperty"
-    public static let keyAuthorization  = "TSLocationPush_authorization"
-    public static let keyAccessToken    = "TSLocationPush_accessToken"
+    public static let keyAppGroup       = "BGLocationPush_appGroup"
+    public static let keyUrl            = "BGLocationPush_url"
+    public static let keyMethod         = "BGLocationPush_method"
+    public static let keyHeaders        = "BGLocationPush_headers"
+    public static let keyParams         = "BGLocationPush_params"
+    public static let keyExtras         = "BGLocationPush_extras"
+    public static let keyRootProperty   = "BGLocationPush_rootProperty"
+    public static let keyAuthorization  = "BGLocationPush_authorization"
+    public static let keyAccessToken    = "BGLocationPush_accessToken"
 
     // Socket delivery (preferred channel for the extension). Written by the host
     // app via BackgroundGeolocation.setLocationPushConfig({...}). When socketUrl
     // is present the extension tries Socket.IO first, then falls back to REST.
-    public static let keySocketUrl       = "TSLocationPush_socketUrl"
-    public static let keySocketPath      = "TSLocationPush_socketPath"
-    public static let keySocketEvent     = "TSLocationPush_socketEvent"
-    public static let keySocketAuthToken = "TSLocationPush_socketAuthToken"
-    public static let keySocketTimeout   = "TSLocationPush_socketTimeout"
+    public static let keySocketUrl       = "BGLocationPush_socketUrl"
+    public static let keySocketPath      = "BGLocationPush_socketPath"
+    public static let keySocketEvent     = "BGLocationPush_socketEvent"
+    public static let keySocketAuthToken = "BGLocationPush_socketAuthToken"
+    public static let keySocketTimeout   = "BGLocationPush_socketTimeout"
 
     // REST fallback used when the socket fails: POST {latitude, longitude,
     // fcmToken, userCurrentTime} to fallbackUrl.
-    public static let keyFallbackUrl     = "TSLocationPush_fallbackUrl"
-    public static let keyFcmToken        = "TSLocationPush_fcmToken"
+    public static let keyFallbackUrl     = "BGLocationPush_fallbackUrl"
+    public static let keyFcmToken        = "BGLocationPush_fcmToken"
 
     // The location push token (hex) the host app obtained from
     // `startMonitoringLocationPushesWithCompletion`. Stored in BOTH the standard
     // and the shared suite so JS can read it via getLocationPushToken().
-    public static let keyLocationPushToken = "TSLocationManager_locationPushToken"
+    public static let keyLocationPushToken = "BGLocationManager_locationPushToken"
 
     /// Resolve the App Group identifier. Allows the host app to override the
     /// default at runtime by writing `keyAppGroup` into standard UserDefaults
