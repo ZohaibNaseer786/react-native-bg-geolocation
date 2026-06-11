@@ -26,28 +26,7 @@ import UIKit
 
     @objc public override init() {
         super.init()
-        BGLocationManager.migrateLegacyKeysIfNeeded()
         setupCoreLocation()
-    }
-
-    /// One-time migration after the TS* → BG* rename. Copies any values still
-    /// stored under the old `TSLocationManager_*` / `TSLocationPush_*` keys to
-    /// their new `BG*` names, in both the standard suite and the App Group, so
-    /// already-issued location-push tokens, odometer, and config survive the
-    /// upgrade. Idempotent and cheap; runs once then no-ops.
-    @objc public static func migrateLegacyKeysIfNeeded() {
-        let suites: [UserDefaults?] = [.standard, BGLocationPushShared.sharedDefaults()]
-        for case let defaults? in suites {
-            guard !defaults.bool(forKey: "BGLocationManager_keysMigrated") else { continue }
-            for (key, value) in defaults.dictionaryRepresentation() {
-                guard key.hasPrefix("TSLocationManager_") || key.hasPrefix("TSLocationPush_") else { continue }
-                let newKey = "BG" + key.dropFirst(2) // TS… -> BG…
-                if defaults.object(forKey: newKey) == nil {
-                    defaults.set(value, forKey: newKey)
-                }
-            }
-            defaults.set(true, forKey: "BGLocationManager_keysMigrated")
-        }
     }
 
     private func setupCoreLocation() {

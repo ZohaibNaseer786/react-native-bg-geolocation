@@ -848,9 +848,7 @@ import UIKit
     }
 
     @objc public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        // Accept the legacy "TSStationary" id for regions iOS was already
-        // monitoring before the TS* → BG* rename (self-heals on next ready()).
-        guard region.identifier == "BGStationary" || region.identifier == "TSStationary" else { return }
+        guard region.identifier == "BGStationary" else { return }
         if !isMoving {
             startUpdatingLocation()
             let fallback: CLLocation

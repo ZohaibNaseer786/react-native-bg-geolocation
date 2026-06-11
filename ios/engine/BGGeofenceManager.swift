@@ -129,7 +129,7 @@ import CoreLocation
     @objc public func stopMonitoringGeofences() {
         _mutateCL { mgr in
             for region in mgr.monitoredRegions {
-                if (region.identifier.hasPrefix("BGGeofence:") || region.identifier.hasPrefix("TSGeofence:")) {
+                if region.identifier.hasPrefix("BGGeofence:") {
                     mgr.stopMonitoring(for: region)
                 }
             }
@@ -151,10 +151,8 @@ import CoreLocation
 
     @objc public func identifierFor(_ region: CLRegion) -> String {
         let id = region.identifier
-        // Accept the legacy "TSGeofence:" prefix for regions registered before
-        // the TS* → BG* rename, alongside the current "BGGeofence:".
-        for prefix in ["BGGeofence:", "TSGeofence:"] where id.hasPrefix(prefix) {
-            return String(id.dropFirst(prefix.count))
+        if id.hasPrefix("BGGeofence:") {
+            return String(id.dropFirst("BGGeofence:".count))
         }
         return id
     }
@@ -163,7 +161,7 @@ import CoreLocation
         guard let mgr = locationManager else { return }
         var coreLocationIds = Set<String>()
         for region in mgr.monitoredRegions {
-            if (region.identifier.hasPrefix("BGGeofence:") || region.identifier.hasPrefix("TSGeofence:")) {
+            if region.identifier.hasPrefix("BGGeofence:") {
                 coreLocationIds.insert(identifierFor(region))
             }
         }
@@ -274,7 +272,7 @@ import CoreLocation
     // MARK: - CLLocationManagerDelegate
 
     @objc public func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        guard (region.identifier.hasPrefix("BGGeofence:") || region.identifier.hasPrefix("TSGeofence:")) else { return }
+        guard region.identifier.hasPrefix("BGGeofence:") else { return }
         let id = identifierFor(region)
         if let geofence = BGGeofenceDAO.sharedInstance().find(id) {
             if geofence.notifyOnEntry {
@@ -287,7 +285,7 @@ import CoreLocation
     }
 
     @objc public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        guard (region.identifier.hasPrefix("BGGeofence:") || region.identifier.hasPrefix("TSGeofence:")) else { return }
+        guard region.identifier.hasPrefix("BGGeofence:") else { return }
         let id = identifierFor(region)
         if let geofence = BGGeofenceDAO.sharedInstance().find(id) {
             geofence.cancelLoitering()
