@@ -1,8 +1,27 @@
+<div align="center">
+
 # react-native-bg-geolocation
 
-Background geolocation tracking for React Native in foreground, background, Android kill state, and iOS kill state (server-triggered via the Location Push Service Extension, plus eligible OS-managed relaunches), with motion detection (moving/stationary), geofencing, and pluggable delivery (socket / HTTP / headless).
+**Production-ready background geolocation for React Native apps across foreground, background, Android headless mode, and iOS Location Push Service Extension kill-state delivery.**
 
-> Educational re-implementation of the `react-native-background-geolocation` API using only public platform APIs (FusedLocationProvider + Activity Recognition on Android, CoreLocation + CoreMotion + BGTaskScheduler on iOS). No proprietary binaries.
+[![React Native](https://img.shields.io/badge/React%20Native-0.85+-61DAFB?style=for-the-badge&logo=react&logoColor=111111)](https://reactnative.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-ready-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![iOS](https://img.shields.io/badge/iOS-15.1+-111111?style=for-the-badge&logo=apple&logoColor=white)](https://developer.apple.com/ios/)
+[![Android](https://img.shields.io/badge/Android-background%20tracking-3DDC84?style=for-the-badge&logo=android&logoColor=111111)](https://developer.android.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+[![npm version](https://img.shields.io/npm/v/react-native-bg-geolocation?style=for-the-badge&logo=npm&label=npm)](https://www.npmjs.com/package/react-native-bg-geolocation)
+[![npm downloads](https://img.shields.io/npm/dm/react-native-bg-geolocation?style=for-the-badge&logo=npm&label=downloads)](https://www.npmjs.com/package/react-native-bg-geolocation)
+[![GitHub stars](https://img.shields.io/github/stars/ZohaibNaseer786/react-native-bg-geolocation?style=for-the-badge&logo=github)](https://github.com/ZohaibNaseer786/react-native-bg-geolocation/stargazers)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=111111)](https://buymeacoffee.com/zohaibnaseer)
+
+`react-native-bg-geolocation` helps React Native apps collect and deliver reliable location updates with **foreground tracking**, **background tracking**, **geofencing**, **motion detection**, **Socket.IO / REST delivery**, **Android headless JS**, **iOS Live Activity**, and **iOS force-quit location push support**.
+
+**Foreground Tracking | Background Tracking | Kill-State Delivery | Geofencing | Motion Detection | Socket.IO + REST Fallback | iOS Location Push | Android Headless JS**
+
+</div>
+
+> Built with public platform APIs: FusedLocationProvider + Activity Recognition on Android, and CoreLocation + CoreMotion + BGTaskScheduler + CLLocationPushServiceExtension on iOS.
 
 ## Features
 
@@ -352,6 +371,21 @@ yarn
 yarn example android   # or: yarn example ios
 ```
 
+## Support
+
+If this package saves you time, please consider giving the repo a star. It helps
+other React Native developers discover the project.
+
+<div align="center">
+
+### Would you like to support me?
+
+[![Follow on GitHub](https://img.shields.io/badge/Follow-@ZohaibNaseer786-181717?style=social&logo=github)](https://github.com/ZohaibNaseer786)
+[![GitHub stars](https://img.shields.io/github/stars/ZohaibNaseer786/react-native-bg-geolocation?style=social)](https://github.com/ZohaibNaseer786/react-native-bg-geolocation/stargazers)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FF813F?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/zohaibnaseer)
+
+</div>
+
 ## Contributing
 
 - [Development workflow](CONTRIBUTING.md#development-workflow)
@@ -359,7 +393,7 @@ yarn example android   # or: yarn example ios
 
 ## License
 
-MIT
+[MIT](LICENSE) © Zohaib Naseer and contributors.
 
 ---
 
