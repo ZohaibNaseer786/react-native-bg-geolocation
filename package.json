@@ -2,18 +2,18 @@
   "name": "react-native-bg-geolocation",
   "version": "0.2.0",
   "description": "Background geolocation tracking for React Native",
-  "main": "./src/index.tsx",
-  "module": "./src/index.tsx",
+  "main": "./lib/module/index.js",
+  "module": "./lib/module/index.js",
   "react-native": "./src/index.tsx",
   "source": "./src/index.tsx",
-  "types": "./src/index.tsx",
-  "comment:entry": "This library is consumed via a GitHub archive tarball, which contains no built lib/ and runs no bob build. All entry points resolve to src so the consumer's Metro/Babel transpiles the source directly — no build step required.",
+  "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
       "source": "./src/index.tsx",
+      "types": "./lib/typescript/src/index.d.ts",
       "react-native": "./src/index.tsx",
-      "types": "./src/index.tsx",
-      "default": "./src/index.tsx"
+      "import": "./lib/module/index.js",
+      "default": "./lib/module/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -40,6 +40,7 @@
     "example": "yarn workspace react-native-bg-geolocation-example",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bob build",
+    "prepublishOnly": "npm run typecheck && npm run lint",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\""
   },
@@ -56,15 +57,16 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zohaibnaseer/react-native-bg-geolocation.git"
+    "url": "git+https://github.com/ZohaibNaseer786/react-native-bg-geolocation.git"
   },
   "author": "Zohaib Naseer <zohaibnaseer2244@gmail.com> (https://github.com/zohaibnaseer786)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/zohaibnaseer/react-native-bg-geolocation/issues"
+    "url": "https://github.com/ZohaibNaseer786/react-native-bg-geolocation/issues"
   },
-  "homepage": "https://github.com/zohaibnaseer/react-native-bg-geolocation#readme",
+  "homepage": "https://github.com/ZohaibNaseer786/react-native-bg-geolocation#readme",
   "publishConfig": {
+    "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {

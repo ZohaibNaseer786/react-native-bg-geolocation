@@ -12,11 +12,9 @@
 //
 //  ── HOST-APP INTEGRATION ──────────────────────────────────────────────────
 //  Consumers of this package must:
-//    • Create an App Group with the identifier in `appGroupIdentifier` below
-//      (or override it — see BGLocationPushShared.resolveAppGroupIdentifier()).
+//    • Set `BGLocationPushAppGroupIdentifier` in BOTH the host app and extension
+//      Info.plist files to the same App Group identifier.
 //    • Add that App Group to BOTH the main app target and the extension target.
-//  If you use a different App Group id, change `defaultAppGroupIdentifier` here
-//  (it is the single source of truth) and rebuild.
 //
 
 import Foundation
@@ -34,9 +32,10 @@ enum BGLocationPushLog {
 
 @objc public final class BGLocationPushShared: NSObject {
 
-    /// The default App Group identifier. The example app uses this value; it is
-    /// the single place to change if you adopt a different group id.
-    public static let defaultAppGroupIdentifier = "group.com.masjidpilot.staging"
+    /// Safe fallback used by the public example. Production apps should set
+    /// `BGLocationPushAppGroupIdentifier` in both target Info.plist files.
+    public static let defaultAppGroupIdentifier = "group.com.example.bggeolocation"
+    public static let infoPlistAppGroupKey = "BGLocationPushAppGroupIdentifier"
 
     // UserDefaults keys written by the host app and read by the extension.
     public static let keyAppGroup       = "BGLocationPush_appGroup"
@@ -82,6 +81,11 @@ enum BGLocationPushLog {
         if let override = UserDefaults.standard.string(forKey: keyAppGroup),
            !override.isEmpty {
             return override
+        }
+        if let configured = Bundle.main.object(
+            forInfoDictionaryKey: infoPlistAppGroupKey
+        ) as? String, !configured.isEmpty {
+            return configured
         }
         return defaultAppGroupIdentifier
     }

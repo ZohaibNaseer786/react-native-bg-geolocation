@@ -1,5 +1,12 @@
 require "xcodeproj"
 
+APP_BUNDLE_ID = ENV.fetch("BG_GEO_APP_BUNDLE_ID", "com.example.bggeolocation")
+LIVE_ACTIVITY_BUNDLE_ID = ENV.fetch(
+  "BG_GEO_LIVE_ACTIVITY_BUNDLE_ID",
+  "#{APP_BUNDLE_ID}.live-activity"
+)
+TEAM_ID = ENV.fetch("APPLE_DEVELOPMENT_TEAM", "")
+
 project_path = File.join(__dir__, "BgGeolocationExample.xcodeproj")
 project = Xcodeproj::Project.open(project_path)
 app_target = project.targets.find { |target| target.name == "BgGeolocationExample" }
@@ -54,7 +61,7 @@ extension_target.build_configurations.each do |configuration|
   settings["APPLICATION_EXTENSION_API_ONLY"] = "YES"
   settings["CODE_SIGN_STYLE"] = "Automatic"
   settings["CURRENT_PROJECT_VERSION"] = "1"
-  settings["DEVELOPMENT_TEAM"] = "KVJ86QZYD3"
+  TEAM_ID.empty? ? settings.delete("DEVELOPMENT_TEAM") : settings["DEVELOPMENT_TEAM"] = TEAM_ID
   settings["GENERATE_INFOPLIST_FILE"] = "NO"
   settings["INFOPLIST_FILE"] = "BgGeolocationLiveActivity/Info.plist"
   settings["IPHONEOS_DEPLOYMENT_TARGET"] = "16.2"
@@ -64,7 +71,7 @@ extension_target.build_configurations.each do |configuration|
     "@executable_path/../../Frameworks"
   ]
   settings["MARKETING_VERSION"] = "1.0"
-  settings["PRODUCT_BUNDLE_IDENTIFIER"] = "com.masjidpilot.staging.LiveActivity"
+  settings["PRODUCT_BUNDLE_IDENTIFIER"] = LIVE_ACTIVITY_BUNDLE_ID
   settings["PRODUCT_NAME"] = "$(TARGET_NAME)"
   settings["SKIP_INSTALL"] = "YES"
   settings["SUPPORTED_PLATFORMS"] = "iphoneos iphonesimulator"

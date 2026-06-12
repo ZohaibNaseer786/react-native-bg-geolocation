@@ -1,14 +1,20 @@
 import { io, type Socket } from 'socket.io-client';
+import {
+  EXAMPLE_AUTH_TOKEN,
+  EXAMPLE_LOCATION_FALLBACK_PATH,
+  EXAMPLE_SERVER_BASE_URL,
+  EXAMPLE_SOCKET_EVENT,
+  EXAMPLE_SOCKET_PATH,
+} from './exampleConfig';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-export const SERVER_BASE_URL = 'https://masjidpilot.duckdns.org';
-export const SOCKET_PATH = '/socket/location';
-export const SOCKET_LOCATION_EVENT = 'location:update';
+export const SERVER_BASE_URL = EXAMPLE_SERVER_BASE_URL;
+export const SOCKET_PATH = EXAMPLE_SOCKET_PATH;
+export const SOCKET_LOCATION_EVENT = EXAMPLE_SOCKET_EVENT;
 const CONNECT_TIMEOUT_MS = 6_000;
 const ACK_TIMEOUT_MS = 10_000;
 
-export const AUTH_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWViNDk0NzYxMDRlOWEwZTc2M2JhNTEiLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJpYXQiOjE3ODAxMjAwNDUsImV4cCI6MTc4MjcxMjA0NX0.qJLZgp32ETKAE4G1pf6NiX3JJFVX6AkTSG0zp5tA5Sk';
+export const AUTH_TOKEN = EXAMPLE_AUTH_TOKEN;
 
 export interface Coordinates {
   latitude: number;
@@ -16,7 +22,7 @@ export interface Coordinates {
 }
 
 // REST fallback used when the socket can't deliver.
-const FALLBACK_PATH = '/api/location/fallback';
+const FALLBACK_PATH = EXAMPLE_LOCATION_FALLBACK_PATH;
 
 const fmt = (l: Coordinates) =>
   `${l.latitude.toFixed(6)}, ${l.longitude.toFixed(6)}`;

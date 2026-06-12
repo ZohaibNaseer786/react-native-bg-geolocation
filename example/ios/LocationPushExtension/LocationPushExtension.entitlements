@@ -9,7 +9,7 @@
 	<!-- Same App Group as the host app so it can READ the synced HTTP config. -->
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.masjidpilot.staging</string>
+		<string>group.com.example.bggeolocation</string>
 	</array>
 </dict>
 </plist>

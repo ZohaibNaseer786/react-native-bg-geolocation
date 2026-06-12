@@ -91,8 +91,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       // Standard suite — JS reads via BackgroundGeolocation.getLocationPushToken().
       UserDefaults.standard.set(token, forKey: "BGLocationManager_locationPushToken")
       // Shared suite — available to the extension if needed.
-      UserDefaults(suiteName: "group.com.masjidpilot.staging")?
-        .set(token, forKey: "BGLocationManager_locationPushToken")
+      if let appGroup = Bundle.main.object(
+        forInfoDictionaryKey: "BGLocationPushAppGroupIdentifier"
+      ) as? String {
+        UserDefaults(suiteName: appGroup)?
+          .set(token, forKey: "BGLocationManager_locationPushToken")
+      }
     }
   }
 

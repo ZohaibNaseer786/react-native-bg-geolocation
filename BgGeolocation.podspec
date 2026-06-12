@@ -1,6 +1,15 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+react_native_package = Pod::Executable.execute_command(
+  "node",
+  [
+    "-p",
+    "require.resolve('react-native/package.json', { paths: [process.argv[1]] })",
+    __dir__,
+  ]
+).strip
+require File.join(File.dirname(react_native_package), "scripts/react_native_pods")
 
 Pod::Spec.new do |s|
   s.name         = "BgGeolocation"
@@ -10,16 +19,11 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => min_ios_version_supported }
-  s.source       = { :git => "https://github.com/zohaibnaseer/react-native-bg-geolocation.git", :tag => "#{s.version}" }
+  s.platforms    = { :ios => "15.1" }
+  s.source       = { :git => "https://github.com/ZohaibNaseer786/react-native-bg-geolocation.git", :tag => "#{s.version}" }
 
   # ObjC++ TurboModule wrapper + all Swift engine files.
   # No binary dependency — the engine is compiled from Swift source directly.
-  # The location-push extension's principal class (BGLocationPushService.swift)
-  # is intentionally EXCLUDED from the pod — it belongs only to the
-  # CLLocationPushServiceExtension target. Only the shared constants
-  # (BGLocationPushShared.swift) are compiled into the engine so it can write
-  # config into the App Group.
   # The location-push extension's PRINCIPAL class (BGLocationPushService.swift)
   # is excluded from the pod — it belongs only to the
   # CLLocationPushServiceExtension target. The shared constants, socket client,

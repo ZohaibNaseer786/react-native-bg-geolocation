@@ -135,10 +135,16 @@ Once approved, add `com.apple.developer.location.push` to the app entitlements.
 
 **2. Add an App Group** shared by the app and the extension (e.g.
 `group.<your-bundle-id>`). The SDK writes its delivery config into this suite so
-the separate-process extension can read where/how to upload.
+the separate-process extension can read where/how to upload. Add the same
+identifier to both targets' `Info.plist` files:
+
+```xml
+<key>BGLocationPushAppGroupIdentifier</key>
+<string>group.your.bundle.id</string>
+```
 
 **3. Add a Location Push Service Extension target** whose principal class is the
-SDK's `TSLocationPushService`. The example app ships a ready-made target and a
+SDK's `BGLocationPushService`. The example app ships a ready-made target and a
 script that wires it (`example/ios/add_location_push_target.rb`) — copy that
 target, or run the equivalent for your project. The extension's `Info.plist`:
 
@@ -148,7 +154,7 @@ target, or run the equivalent for your project. The extension's `Info.plist`:
   <key>NSExtensionPointIdentifier</key>
   <string>com.apple.location.push.service</string>
   <key>NSExtensionPrincipalClass</key>
-  <string>TSLocationPushService</string>
+  <string>BGLocationPushService</string>
 </dict>
 ```
 
@@ -166,7 +172,7 @@ if #available(iOS 15.0, *) {
   mgr.startMonitoringLocationPushes { tokenData, error in
     guard let data = tokenData else { return }
     let token = data.map { String(format: "%02hhx", $0) }.joined()
-    UserDefaults.standard.set(token, forKey: "TSLocationManager_locationPushToken")
+    UserDefaults.standard.set(token, forKey: "BGLocationManager_locationPushToken")
   }
 }
 ```
