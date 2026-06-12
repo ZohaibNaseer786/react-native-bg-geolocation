@@ -9,9 +9,10 @@ require "xcodeproj"
 
 APP_TARGET_NAME       = "BgGeolocationExample"
 EXT_TARGET_NAME       = "LocationPushExtension"
-EXT_BUNDLE_ID         = "com.masjidpilot.staging.location-push"
-APP_GROUP             = "group.com.masjidpilot.staging"
-TEAM_ID               = "KVJ86QZYD3"
+APP_BUNDLE_ID         = ENV.fetch("BG_GEO_APP_BUNDLE_ID", "com.example.bggeolocation")
+EXT_BUNDLE_ID         = ENV.fetch("BG_GEO_LOCATION_PUSH_BUNDLE_ID", "#{APP_BUNDLE_ID}.location-push")
+APP_GROUP             = ENV.fetch("BG_GEO_APP_GROUP", "group.com.example.bggeolocation")
+TEAM_ID               = ENV.fetch("APPLE_DEVELOPMENT_TEAM", "")
 APP_ENTITLEMENTS_PATH = "BgGeolocationExample/BgGeolocationExample.entitlements"
 EXT_ENTITLEMENTS_PATH = "LocationPushExtension/LocationPushExtension.entitlements"
 EXT_INFO_PLIST        = "LocationPushExtension/Info.plist"
@@ -36,7 +37,7 @@ shared_group = project.main_group.find_subpath("LocationPushShared", true)
 shared_group.set_source_tree("SOURCE_ROOT")
 shared_group.set_path("../../ios/locationpush")
 
-%w[TSLocationPushShared.swift TSLocationPushSocketClient.swift TSLocationPushDeliverer.swift TSLocationPushService.swift].each do |name|
+%w[BGLocationPushShared.swift BGLocationPushSocketClient.swift BGLocationPushDeliverer.swift BGLocationPushService.swift].each do |name|
   file = shared_group.files.find { |f| f.path == name } || shared_group.new_file(name)
   unless ext_target.source_build_phase.files_references.include?(file)
     ext_target.source_build_phase.add_file_reference(file)
@@ -68,7 +69,7 @@ ext_target.build_configurations.each do |config|
   s["CODE_SIGN_STYLE"] = "Automatic"
   s["CODE_SIGN_ENTITLEMENTS"] = EXT_ENTITLEMENTS_PATH
   s["CURRENT_PROJECT_VERSION"] = "1"
-  s["DEVELOPMENT_TEAM"] = TEAM_ID
+  TEAM_ID.empty? ? s.delete("DEVELOPMENT_TEAM") : s["DEVELOPMENT_TEAM"] = TEAM_ID
   s["GENERATE_INFOPLIST_FILE"] = "NO"
   s["INFOPLIST_FILE"] = EXT_INFO_PLIST
   s["IPHONEOS_DEPLOYMENT_TARGET"] = "15.0"
@@ -89,6 +90,12 @@ end
 # ── 6. Attach the host app entitlements (location.push + App Group + aps) ────
 app_target.build_configurations.each do |config|
   config.build_settings["CODE_SIGN_ENTITLEMENTS"] = APP_ENTITLEMENTS_PATH
+  config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = APP_BUNDLE_ID
+  if TEAM_ID.empty?
+    config.build_settings.delete("DEVELOPMENT_TEAM")
+  else
+    config.build_settings["DEVELOPMENT_TEAM"] = TEAM_ID
+  end
 end
 
 # ── 7. Dependency + embed the extension into the app ────────────────────────

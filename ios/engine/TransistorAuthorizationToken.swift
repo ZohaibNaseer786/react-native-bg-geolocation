@@ -9,7 +9,7 @@ import UIKit
     @objc public var apiUrl: String?
     @objc public var refreshUrl: String?
 
-    private static let storagePrefix = "TSLocationManager_transistor_token_"
+    private static let storagePrefix = "BGLocationManager_transistor_token_"
 
     @objc public class func storageKey(forHost host: String) -> String {
         return "\(storagePrefix)\(host)"
@@ -58,7 +58,7 @@ import UIKit
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 60.0
 
-        let deviceInfo = TSDeviceInfo.sharedInstance
+        let deviceInfo = BGDeviceInfo.sharedInstance
         let body: [String: Any] = [
             "org": org,
             "device": [

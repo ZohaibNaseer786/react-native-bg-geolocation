@@ -33,6 +33,10 @@ import {
   setFcmToken,
   type Coordinates,
 } from './locationSocketService';
+import {
+  EXAMPLE_APP_BUNDLE_ID,
+  EXAMPLE_PUSH_TOKEN_REGISTRATION_PATH,
+} from './exampleConfig';
 
 const LOCATION_SOCKET_INTERVAL_MS = 60 * 1000;
 const LOCATION_SOCKET_HEARTBEAT_SECONDS = 60;
@@ -350,7 +354,9 @@ export async function registerLocationPushToken(): Promise<string | null> {
 
   let token: string | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
-    token = await BackgroundGeolocation.getLocationPushToken().catch(() => null);
+    token = await BackgroundGeolocation.getLocationPushToken().catch(
+      () => null
+    );
     if (token) break;
     await sleep(1500);
   }
@@ -362,20 +368,23 @@ export async function registerLocationPushToken(): Promise<string | null> {
 
   log(`🔑 location-push token: ${token.slice(0, 12)}…`);
   try {
-    const res = await fetch(`${SERVER_BASE_URL}/location-push/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${AUTH_TOKEN}`,
-      },
-      body: JSON.stringify({
-        token,
-        platform: 'ios',
-        // apns-topic the server must use when pushing to this token:
-        // <main-bundle-id>.location-query, apns-push-type: location.
-        topic: 'com.masjidpilot.staging.location-query',
-      }),
-    });
+    const res = await fetch(
+      `${SERVER_BASE_URL}${EXAMPLE_PUSH_TOKEN_REGISTRATION_PATH}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({
+          token,
+          platform: 'ios',
+          // apns-topic the server must use when pushing to this token:
+          // <main-bundle-id>.location-query, apns-push-type: location.
+          topic: `${EXAMPLE_APP_BUNDLE_ID}.location-query`,
+        }),
+      }
+    );
     log(`location-push token register → HTTP ${res.status}`);
   } catch (err) {
     log(`❌ failed to register location-push token: ${String(err)}`);
@@ -421,20 +430,23 @@ export async function registerApnsDeviceToken(): Promise<string | null> {
   );
 
   try {
-    const res = await fetch(`${SERVER_BASE_URL}/location-push/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${AUTH_TOKEN}`,
-      },
-      body: JSON.stringify({
-        token,
-        platform: 'ios',
-        kind: 'apns-background',
-        // Background pushes use the plain app bundle id as apns-topic.
-        topic: 'com.masjidpilot.staging',
-      }),
-    });
+    const res = await fetch(
+      `${SERVER_BASE_URL}${EXAMPLE_PUSH_TOKEN_REGISTRATION_PATH}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({
+          token,
+          platform: 'ios',
+          kind: 'apns-background',
+          // Background pushes use the plain app bundle id as apns-topic.
+          topic: EXAMPLE_APP_BUNDLE_ID,
+        }),
+      }
+    );
     log(`APNs device token register → HTTP ${res.status}`);
   } catch (err) {
     log(`❌ failed to register APNs device token: ${String(err)}`);

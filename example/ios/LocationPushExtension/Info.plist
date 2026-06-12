@@ -18,6 +18,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>BGLocationPushAppGroupIdentifier</key>
+	<string>group.com.example.bggeolocation</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -28,7 +30,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.location.push.service</string>
 		<key>NSExtensionPrincipalClass</key>
-		<string>TSLocationPushService</string>
+		<string>BGLocationPushService</string>
 	</dict>
 	<key>RCTNewArchEnabled</key>
 	<true/>

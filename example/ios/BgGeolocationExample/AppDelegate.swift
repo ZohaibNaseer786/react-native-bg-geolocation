@@ -17,7 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
   // Background-push completion handlers, keyed by a per-push requestId. JS calls
   // BackgroundGeolocation.finishLocationPush(requestId) when it's done, which
-  // posts TSLocationPushFinished → we invoke + remove the matching handler.
+  // posts BGLocationPushFinished → we invoke + remove the matching handler.
   private var backgroundPushCompletions: [String: (UIBackgroundFetchResult) -> Void] = [:]
 
   func application(
@@ -25,7 +25,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     if launchOptions?[.location] != nil || application.applicationState == .background {
-      UserDefaults.standard.set(true, forKey: "TSLocationManager_didLaunchInBackground")
+      UserDefaults.standard.set(true, forKey: "BGLocationManager_didLaunchInBackground")
       UserDefaults.standard.synchronize()
     }
 
@@ -40,7 +40,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // When JS signals it finished handling a background push, release the app.
     NotificationCenter.default.addObserver(
-      forName: Notification.Name("TSLocationPushFinished"),
+      forName: Notification.Name("BGLocationPushFinished"),
       object: nil,
       queue: .main
     ) { [weak self] note in
@@ -89,10 +89,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       NSLog("[BGGEO] ✅ Location push token: \(token)")
 
       // Standard suite — JS reads via BackgroundGeolocation.getLocationPushToken().
-      UserDefaults.standard.set(token, forKey: "TSLocationManager_locationPushToken")
+      UserDefaults.standard.set(token, forKey: "BGLocationManager_locationPushToken")
       // Shared suite — available to the extension if needed.
-      UserDefaults(suiteName: "group.com.masjidpilot.staging")?
-        .set(token, forKey: "TSLocationManager_locationPushToken")
+      if let appGroup = Bundle.main.object(
+        forInfoDictionaryKey: "BGLocationPushAppGroupIdentifier"
+      ) as? String {
+        UserDefaults(suiteName: appGroup)?
+          .set(token, forKey: "BGLocationManager_locationPushToken")
+      }
     }
   }
 
@@ -104,7 +108,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   ) {
     let token = deviceToken.map { String(format: "%02hhx", $0) }.joined()
     NSLog("[BGGEO] ✅ APNs device token: \(token)")
-    UserDefaults.standard.set(token, forKey: "TSLocationManager_apnsDeviceToken")
+    UserDefaults.standard.set(token, forKey: "BGLocationManager_apnsDeviceToken")
     // The JS layer ships this to the server (see registerApnsDeviceToken()).
   }
 
@@ -138,7 +142,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     NSLog("[BGGEO] background push → JS (requestId=\(requestId), query=\(queryId))")
 
     NotificationCenter.default.post(
-      name: Notification.Name("TSLocationPushBackground"),
+      name: Notification.Name("BGLocationPushBackground"),
       object: nil,
       userInfo: ["requestId": requestId, "locationQueryId": queryId]
     )

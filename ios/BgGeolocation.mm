@@ -54,13 +54,13 @@ static NSString *const EVENT_LOCATIONPUSH       = @"locationpush";
 // the module emits the JS "locationpush" event. When JS calls
 // finishLocationPush(requestId) the module posts FINISHED so AppDelegate can
 // invoke the stored UIBackgroundFetchResult completion handler.
-static NSString *const NOTIF_LOCATIONPUSH_BACKGROUND = @"TSLocationPushBackground";
-static NSString *const NOTIF_LOCATIONPUSH_FINISHED   = @"TSLocationPushFinished";
+static NSString *const NOTIF_LOCATIONPUSH_BACKGROUND = @"BGLocationPushBackground";
+static NSString *const NOTIF_LOCATIONPUSH_FINISHED   = @"BGLocationPushFinished";
 
 @implementation BgGeolocation {
   BOOL   _ready;
   NSInteger _watchId;
-  TSLocationManager *_engine;   // our Swift engine instance
+  BGLocationManager *_engine;   // our Swift engine instance
 }
 
 RCT_EXPORT_MODULE();
@@ -72,7 +72,7 @@ RCT_EXPORT_MODULE();
   if (self) {
     _ready  = NO;
     _watchId = -1;
-    _engine = [TSLocationManager sharedInstance];
+    _engine = [BGLocationManager sharedInstance];
   }
   return self;
 }
@@ -92,31 +92,31 @@ RCT_EXPORT_MODULE();
 - (void)registerEventListeners {
   __typeof(self) __weak me = self;
 
-  [_engine onLocation:^(TSLocation *location) {
+  [_engine onLocation:^(BGLocation *location) {
     [me sendEventWithName:EVENT_LOCATION body:[location toDictionary]];
   } failure:^(NSError *error) {
     [me sendEventWithName:EVENT_LOCATION body:@{@"error": @(error.code)}];
   }];
 
-  [_engine onMotionChange:^(TSLocation *location) {
+  [_engine onMotionChange:^(BGLocation *location) {
     [me sendEventWithName:EVENT_MOTIONCHANGE body:@{
       @"isMoving": @(location.isMoving),
       @"location": [location toDictionary]
     }];
   } failure:nil];
 
-  [_engine onActivityChange:^(TSMotionActivity *activity) {
+  [_engine onActivityChange:^(BGMotionActivity *activity) {
     [me sendEventWithName:EVENT_ACTIVITYCHANGE body:@{
       @"activity":   activity.name ?: @"unknown",
       @"confidence": @(activity.confidence)
     }];
   }];
 
-  [_engine onHeartbeat:^(TSHeartbeatEvent *event) {
+  [_engine onHeartbeat:^(BGHeartbeatEvent *event) {
     [me sendEventWithName:EVENT_HEARTBEAT body:[event toDictionary]];
   }];
 
-  [_engine onGeofence:^(TSGeofenceEvent *event) {
+  [_engine onGeofence:^(BGGeofenceEvent *event) {
     [me sendEventWithName:EVENT_GEOFENCE body:[event toDictionary]];
   }];
 
@@ -124,12 +124,12 @@ RCT_EXPORT_MODULE();
     [me sendEventWithName:EVENT_HTTP body:response];
   }];
 
-  [_engine onProviderChange:^(TSProviderChangeEvent *event) {
+  [_engine onProviderChange:^(BGProviderChangeEvent *event) {
     [me sendEventWithName:EVENT_PROVIDERCHANGE body:[event toDictionary]];
   }];
 
-  [_engine onSchedule:^(TSScheduleEvent *event) {
-    // TSScheduleEvent.state is Any? — safely cast to dict or send an empty marker
+  [_engine onSchedule:^(BGScheduleEvent *event) {
+    // BGScheduleEvent.state is Any? — safely cast to dict or send an empty marker
     NSDictionary *body = [event.state isKindOfClass:[NSDictionary class]]
       ? (NSDictionary *)event.state : @{};
     [me sendEventWithName:EVENT_SCHEDULE body:body];
@@ -147,7 +147,7 @@ RCT_EXPORT_MODULE();
     [me sendEventWithName:EVENT_ENABLEDCHANGE body:@(enabled)];
   }];
 
-  [_engine onAuthorization:^(TSAuthorizationEvent *event) {
+  [_engine onAuthorization:^(BGAuthorizationEvent *event) {
     [me sendEventWithName:EVENT_AUTHORIZATION body:[event toDictionary]];
   }];
 
@@ -167,9 +167,9 @@ RCT_EXPORT_MODULE();
       NSString *requestId = note.userInfo[@"requestId"] ?: @"";
       id queryId          = note.userInfo[@"locationQueryId"] ?: [NSNull null];
 
-      TSCurrentPositionRequest *request =
-        [TSCurrentPositionRequest requestWithSuccess:^(id locationObj) {
-          TSLocation *tsLocation = (TSLocation *)locationObj;
+      BGCurrentPositionRequest *request =
+        [BGCurrentPositionRequest requestWithSuccess:^(id locationObj) {
+          BGLocation *tsLocation = (BGLocation *)locationObj;
           CLLocation *loc = tsLocation.location;
           NSDictionary *dict = [tsLocation toDictionary];
 
@@ -195,7 +195,7 @@ RCT_EXPORT_MODULE();
           if (loc != nil) {
             CLLocationCoordinate2D c = loc.coordinate;
             NSString *ts = [strongMe iso8601StringFromDate:loc.timestamp];
-            [TSLocationPushDeliverer deliverWithLatitude:c.latitude
+            [BGLocationPushDeliverer deliverWithLatitude:c.latitude
                                                longitude:c.longitude
                                                 accuracy:MAX(loc.horizontalAccuracy, 0)
                                                    speed:loc.speed
@@ -233,8 +233,8 @@ RCT_EXPORT_MODULE();
 - (void)ready:(NSDictionary *)config success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   if (_ready) {
     BOOL resetFlag = config[@"reset"] ? [config[@"reset"] boolValue] : YES;
-    if (resetFlag) [[TSConfig sharedInstance] updateWithDictionary:config];
-    success(@[[TSConfig sharedInstance].toDictionary]);
+    if (resetFlag) [[BGConfig sharedInstance] updateWithDictionary:config];
+    success(@[[BGConfig sharedInstance].toDictionary]);
     return;
   }
   _ready = YES;
@@ -246,7 +246,7 @@ RCT_EXPORT_MODULE();
     if (root) { self->_engine.viewController = root; }
 
     @try {
-      TSConfig *cfg = [TSConfig sharedInstance];
+      BGConfig *cfg = [BGConfig sharedInstance];
       BOOL resetFlag = config[@"reset"] ? [config[@"reset"] boolValue] : YES;
 
       if (cfg.isFirstBoot) {
@@ -272,7 +272,7 @@ RCT_EXPORT_MODULE();
 }
 
 - (void)reset:(NSDictionary *)config success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  TSConfig *cfg = [TSConfig sharedInstance];
+  BGConfig *cfg = [BGConfig sharedInstance];
   @try {
     if (config.count > 0) { [cfg resetConfig:@{}]; [cfg updateWithDictionary:config]; }
     else { [cfg reset]; }
@@ -281,8 +281,8 @@ RCT_EXPORT_MODULE();
 }
 
 - (void)setConfig:(NSDictionary *)config success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  [[TSConfig sharedInstance] updateWithDictionary:config];
-  success(@[[TSConfig sharedInstance].toDictionary]);
+  [[BGConfig sharedInstance] updateWithDictionary:config];
+  success(@[[BGConfig sharedInstance].toDictionary]);
 }
 
 - (void)getState:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
@@ -320,7 +320,7 @@ RCT_EXPORT_MODULE();
 - (void)startGeofences:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   dispatch_async(dispatch_get_main_queue(), ^{
     [self->_engine startGeofences];
-    success(@[[TSConfig sharedInstance].toDictionary]);
+    success(@[[BGConfig sharedInstance].toDictionary]);
   });
 }
 
@@ -343,8 +343,8 @@ RCT_EXPORT_MODULE();
 }
 
 - (void)getCurrentPosition:(NSDictionary *)options success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  TSCurrentPositionRequest *request = [TSCurrentPositionRequest requestWithSuccess:^(id location) {
-    success(@[[(TSLocation *)location toDictionary]]);
+  BGCurrentPositionRequest *request = [BGCurrentPositionRequest requestWithSuccess:^(id location) {
+    success(@[[(BGLocation *)location toDictionary]]);
   } failure:^(NSInteger code) {
     failure(@[@(code)]);
   }];
@@ -360,9 +360,9 @@ RCT_EXPORT_MODULE();
 - (void)watchPosition:(NSDictionary *)options success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   // interval is private(set) — use the factory that accepts it up front
   double interval = options[@"interval"] ? [options[@"interval"] doubleValue] : 60000.0;
-  TSWatchPositionRequest *request = [TSWatchPositionRequest requestWithInterval:interval
+  BGWatchPositionRequest *request = [BGWatchPositionRequest requestWithInterval:interval
     success:^(id location) {
-      [self sendEventWithName:EVENT_WATCHPOSITION body:[(TSLocation *)location toDictionary]];
+      [self sendEventWithName:EVENT_WATCHPOSITION body:[(BGLocation *)location toDictionary]];
     } failure:^(NSInteger code) {}];
   if (options[@"desiredAccuracy"]) request.desiredAccuracy = [options[@"desiredAccuracy"] doubleValue];
   if (options[@"persist"])         request.persist = [options[@"persist"] boolValue];
@@ -442,8 +442,8 @@ RCT_EXPORT_MODULE();
     horizontalAccuracy:[coords[@"accuracy"] doubleValue]
     verticalAccuracy:[coords[@"altitudeAccuracy"] doubleValue]
     timestamp:[NSDate date]];
-  TSLocation *loc = [[TSLocation alloc] initWithLocation:cl type:@"manual" extras:location[@"extras"]];
-  [_engine insertLocation:loc success:^(TSLocation *l) { success(@[[l uuid]]); }
+  BGLocation *loc = [[BGLocation alloc] initWithLocation:cl type:@"manual" extras:location[@"extras"]];
+  [_engine insertLocation:loc success:^(BGLocation *l) { success(@[[l uuid]]); }
                   failure:^(NSError *error) { failure(@[error.localizedDescription ?: @"insert_error"]); }];
 }
 
@@ -459,8 +459,8 @@ RCT_EXPORT_MODULE();
 }
 
 - (void)setOdometer:(double)value success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  TSCurrentPositionRequest *request = [TSCurrentPositionRequest requestWithSuccess:^(id location) {
-    success(@[[(TSLocation *)location toDictionary]]);
+  BGCurrentPositionRequest *request = [BGCurrentPositionRequest requestWithSuccess:^(id location) {
+    success(@[[(BGLocation *)location toDictionary]]);
   } failure:^(NSInteger code) {
     failure(@[@(code)]);
   }];
@@ -470,7 +470,7 @@ RCT_EXPORT_MODULE();
 #pragma mark - Geofences
 
 - (void)addGeofence:(NSDictionary *)config success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  TSGeofence *gf = [self buildGeofence:config];
+  BGGeofence *gf = [self buildGeofence:config];
   if (!gf) { failure(@[@"Invalid geofence data"]); return; }
   [_engine addGeofence:gf success:^{ success(@[]); }
               failure:^(NSError *error) { failure(@[error.localizedDescription ?: @"geofence_error"]); }];
@@ -479,7 +479,7 @@ RCT_EXPORT_MODULE();
 - (void)addGeofences:(NSArray *)geofences success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   NSMutableArray *list = [NSMutableArray new];
   for (NSDictionary *params in geofences) {
-    TSGeofence *gf = [self buildGeofence:params];
+    BGGeofence *gf = [self buildGeofence:params];
     if (!gf) { failure(@[@"Invalid geofence data"]); return; }
     [list addObject:gf];
   }
@@ -487,9 +487,9 @@ RCT_EXPORT_MODULE();
                failure:^(NSError *error) { failure(@[error.localizedDescription ?: @"geofences_error"]); }];
 }
 
-- (TSGeofence *)buildGeofence:(NSDictionary *)params {
+- (BGGeofence *)buildGeofence:(NSDictionary *)params {
   if (!params[@"identifier"]) return nil;
-  return [TSGeofence circleWithIdentifier:params[@"identifier"]
+  return [BGGeofence circleWithIdentifier:params[@"identifier"]
                                     radius:[params[@"radius"] doubleValue]
                                   latitude:[params[@"latitude"] doubleValue]
                                  longitude:[params[@"longitude"] doubleValue]
@@ -513,13 +513,13 @@ RCT_EXPORT_MODULE();
 - (void)getGeofences:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   [_engine getGeofences:^(NSArray *geofences) {
     NSMutableArray *result = [NSMutableArray new];
-    for (TSGeofence *g in geofences) [result addObject:[g toDictionary]];
+    for (BGGeofence *g in geofences) [result addObject:[g toDictionary]];
     success(@[result]);
   } failure:^(NSError *error) { failure(@[error.localizedDescription ?: @"get_geofences_error"]); }];
 }
 
 - (void)getGeofence:(NSString *)identifier success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  [_engine getGeofence:identifier success:^(TSGeofence *g) { success(@[[g toDictionary]]); }
+  [_engine getGeofence:identifier success:^(BGGeofence *g) { success(@[[g toDictionary]]); }
               failure:^(NSError *error) { failure(@[error.localizedDescription ?: @"get_geofence_error"]); }];
 }
 
@@ -534,8 +534,8 @@ RCT_EXPORT_MODULE();
 }
 
 - (void)setLogLevel:(double)value success:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
-  [[TSConfig sharedInstance] updateWithDictionary:@{@"logLevel": @(value)}];
-  success(@[[TSConfig sharedInstance].toDictionary]);
+  [[BGConfig sharedInstance] updateWithDictionary:@{@"logLevel": @(value)}];
+  success(@[[BGConfig sharedInstance].toDictionary]);
 }
 
 - (void)getLog:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
@@ -590,13 +590,13 @@ RCT_EXPORT_MODULE();
 
 - (void)getLocationPushToken:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   NSString *token = [[NSUserDefaults standardUserDefaults]
-                     stringForKey:@"TSLocationManager_locationPushToken"];
+                     stringForKey:@"BGLocationManager_locationPushToken"];
   success(@[token ?: [NSNull null]]);
 }
 
 - (void)getApnsDeviceToken:(RCTResponseSenderBlock)success failure:(RCTResponseSenderBlock)failure {
   NSString *token = [[NSUserDefaults standardUserDefaults]
-                     stringForKey:@"TSLocationManager_apnsDeviceToken"];
+                     stringForKey:@"BGLocationManager_apnsDeviceToken"];
   success(@[token ?: [NSNull null]]);
 }
 
@@ -658,14 +658,14 @@ RCT_EXPORT_MODULE();
 //
 // This standalone class eagerly constructs the engine at class-load time and
 // also observes UIApplicationDidFinishLaunchingNotification — recreating the
-// CLLocationManager, installing the TSCLRouter delegate, and (via auto-resume)
+// CLLocationManager, installing the BGCLRouter delegate, and (via auto-resume)
 // re-arming SLC/region + native HTTP delivery — independently of React Native.
 // (It lives in its own class because BgGeolocation's +load is already provided
 // by the RCT_EXPORT_MODULE() macro, so a second +load there would collide.)
-@interface TSLaunchBootstrap : NSObject
+@interface BGLaunchBootstrap : NSObject
 @end
 
-@implementation TSLaunchBootstrap
+@implementation BGLaunchBootstrap
 
 + (void)bootstrapFromNotification:(NSNotification *)note phase:(NSString *)phase {
     BOOL launchedForLocation =
@@ -674,7 +674,7 @@ RCT_EXPORT_MODULE();
         [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
     if (launchedForLocation || inBackground) {
       [[NSUserDefaults standardUserDefaults] setBool:YES
-                                              forKey:@"TSLocationManager_didLaunchInBackground"];
+                                              forKey:@"BGLocationManager_didLaunchInBackground"];
       [[NSUserDefaults standardUserDefaults] synchronize];
     }
     // Diagnostic marker — visible in the iOS unified log (`log show` /
@@ -685,7 +685,7 @@ RCT_EXPORT_MODULE();
     // singleton's setupCoreLocation runs auto-resume when tracking was persisted
     // enabled; on a normal foreground launch with tracking disabled this just
     // creates + configures the (idle) manager, which is harmless.
-    TSLocationManager *manager = [TSLocationManager sharedInstance];
+    BGLocationManager *manager = [BGLocationManager sharedInstance];
     if (launchedForLocation || inBackground) {
       [manager ready];
     }
@@ -694,8 +694,8 @@ RCT_EXPORT_MODULE();
 + (void)load {
   // For a previously-enabled tracker, persisted config is enough to resume the
   // engine before React Native or the application delegate has finished booting.
-  // CLLocationManager is created on the main thread by TSLocationManager.
-  (void)[TSLocationManager sharedInstance];
+  // CLLocationManager is created on the main thread by BGLocationManager.
+  (void)[BGLocationManager sharedInstance];
 
   NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
   [center addObserverForName:UIApplicationDidFinishLaunchingNotification
