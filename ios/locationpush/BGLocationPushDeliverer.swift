@@ -88,7 +88,7 @@ private final class BGLocationPushDeliveryJob {
                 url: socketUrl, path: path, event: event, authToken: token, timeout: timeout
             ))
             socketClient = client
-            client.emit(payload(defaults: defaults, default: socketPayload())) { [weak self] ok in
+            client.emit(payload(defaults: defaults, default: defaultPayload())) { [weak self] ok in
                 guard let self = self else { return }
                 if ok {
                     BGLocationPushLog.log("✅ delivered via socket")
@@ -115,14 +115,7 @@ private final class BGLocationPushDeliveryJob {
         if let fallbackString = defaults.string(forKey: BGLocationPushShared.keyFallbackUrl),
            !fallbackString.isEmpty, let fallbackUrl = URL(string: fallbackString) {
             url = fallbackUrl
-            let defaultBody: [String: Any] = [
-                "latitude": latitude,
-                "longitude": longitude,
-                "fcmToken": defaults.string(forKey: BGLocationPushShared.keyFcmToken) ?? "",
-                "userCurrentTime": BGLocationPushDeliverer.currentTimeHHmm(),
-                "location_query_id": queryId
-            ]
-            body = payload(defaults: defaults, default: defaultBody)
+            body = payload(defaults: defaults, default: defaultPayload())
             BGLocationPushLog.log("REST fallback → \(fallbackString)")
         } else {
             let urlString = defaults.string(forKey: BGLocationPushShared.keyUrl) ?? ""
@@ -224,12 +217,18 @@ private final class BGLocationPushDeliveryJob {
         return value
     }
 
-    private func socketPayload() -> [String: Any] {
-        [
-            "latitude": latitude, "longitude": longitude,
-            "accuracy": max(accuracy, 0), "speed": speed, "heading": heading,
-            "altitude": altitude, "timestamp": timestampISO,
-            "location_query_id": queryId, "source": "location-push"
+    /// Built-in default upload body (socket emit + REST fallback) when the host
+    /// does not supply a `payloadTemplate`. Matches the backend's expected shape.
+    private func defaultPayload() -> [String: Any] {
+        let fcm = BGLocationPushShared.sharedDefaults()?
+            .string(forKey: BGLocationPushShared.keyFcmToken) ?? ""
+        return [
+            "lat": latitude,
+            "long": longitude,
+            "fcm_token": fcm,
+            "device_type": "ios",
+            "user_current_time": BGLocationPushDeliverer.currentTimeHHmm(),
+            "location_query_id": queryId
         ]
     }
 

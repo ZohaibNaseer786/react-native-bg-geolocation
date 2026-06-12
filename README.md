@@ -214,7 +214,8 @@ patching. Tokens (use inside string values): `{latitude}`/`{lat}`,
 native type (numbers stay numbers); inline tokens (`'v2-{queryId}'`) interpolate
 as strings; nested objects/arrays are supported. Without `payloadTemplate` the
 deliverer posts the default body
-`{ latitude, longitude, fcmToken, userCurrentTime, location_query_id }`.
+`{ lat, long, fcm_token, device_type: "ios", user_current_time, location_query_id }`
+(applies to both the socket emit and the REST fallback).
 
 **6. App-alive handler (optional).** When the app is alive, the SDK still
 delivers natively and emits a `locationpush` event so your JS can react. The

@@ -122,7 +122,7 @@ const flattenConfig = (
 
   // Copy top-level keys — exclude nested section containers but KEEP `reset`
   // so the native ready() can honour it (reset:false avoids wiping persisted
-  // TSConfig on kill-state relaunches, which would destroy stopOnTerminate etc.)
+  // config on kill-state relaunches, which would destroy stopOnTerminate etc.)
   Object.keys(config).forEach((key) => {
     if (!nestedKeys.includes(key)) {
       out[key] = config[key];
@@ -920,9 +920,7 @@ export default class BackgroundGeolocation {
    *
    * No-op on Android.
    */
-  static setLocationPushConfig(
-    config: Record<string, any>
-  ): Promise<void> {
+  static setLocationPushConfig(config: Record<string, any>): Promise<void> {
     if (Platform.OS !== 'ios') {
       return Promise.resolve();
     }
