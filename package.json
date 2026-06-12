@@ -1,6 +1,6 @@
 {
   "name": "react-native-bg-geolocation",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Production-ready React Native background geolocation with iOS Location Push kill-state delivery, Android headless tracking, geofencing, motion detection, Socket.IO, and REST fallback.",
   "main": "./lib/module/index.js",
   "module": "./lib/module/index.js",
