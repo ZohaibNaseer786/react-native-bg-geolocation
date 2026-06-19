@@ -20,6 +20,13 @@ import CoreLocation
     // and tracks continuously instead of relying on motion/region wakeups.
     // Higher battery cost; far more reliable background tracking.
     @objc public var disableStopDetection: Bool = false
+    // Motion-gated battery saver. When false, full-power GPS runs ONLY while the
+    // user is moving: the engine auto-enables continuous GPS on motion onset and
+    // powers it down again when the user stops (overriding disableStopDetection
+    // keep-alive). While stationary it relies on low-power motion detection,
+    // significant-location-change / region relaunch, and APNs location pushes.
+    // When true, GPS tracks continuously regardless of motion. Default true.
+    @objc public var continuousLocationUpdates: Bool = true
     @objc public var locationAuthorizationRequest: String = "Always"
     @objc public var locationAuthorizationAlert: [String: String] = [:]
     @objc public var disableLocationAuthorizationAlert: Bool = false
@@ -78,6 +85,7 @@ import CoreLocation
         showsBackgroundLocationIndicator = false
         useSignificantChangesOnly = false
         disableStopDetection = false
+        continuousLocationUpdates = true
         locationAuthorizationRequest = "Always"
         disableLocationAuthorizationAlert = false
         geofenceProximityRadius = 1000.0
@@ -116,6 +124,7 @@ import CoreLocation
             BGPropertySpec(name: "showsBackgroundLocationIndicator", type: "bool"),
             BGPropertySpec(name: "useSignificantChangesOnly", type: "bool"),
             BGPropertySpec(name: "disableStopDetection", type: "bool"),
+            BGPropertySpec(name: "continuousLocationUpdates", type: "bool"),
             BGPropertySpec(name: "locationAuthorizationRequest", type: "string"),
             BGPropertySpec(name: "disableLocationAuthorizationAlert", type: "bool"),
             BGPropertySpec(name: "geofenceProximityRadius", type: "double"),

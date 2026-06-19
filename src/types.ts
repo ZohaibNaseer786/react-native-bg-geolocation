@@ -104,6 +104,16 @@ export interface GeolocationConfig {
   stopTimeout?: number;
   stopDetectionDelay?: number;
   disableStopDetection?: boolean;
+  /**
+   * iOS. Motion-gated battery saver. When `false`, full-power GPS runs **only
+   * while the user is moving** — the engine automatically turns continuous GPS
+   * on at motion onset (so travel is tracked and sent to your server) and turns
+   * it off again when the user stops. While stationary it relies on low-power
+   * motion detection, significant-change / region relaunch, and APNs location
+   * pushes. When `true`, GPS tracks continuously regardless of motion.
+   * Default `true`.
+   */
+  continuousLocationUpdates?: boolean;
   disableMotionActivityUpdates?: boolean;
   locationAuthorizationRequest?: 'Always' | 'WhenInUse' | 'Any';
   geofenceProximityRadius?: number;

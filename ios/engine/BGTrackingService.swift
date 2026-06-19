@@ -171,6 +171,19 @@ import UIKit
     // MARK: - Location updating
 
     @objc public func startUpdatingLocation() {
+        // Battery saver: when continuousLocationUpdates is false, run full-power
+        // GPS ONLY while the user is moving. When stationary, skip it — the
+        // engine still detects motion onset (motion coprocessor / SLC / region)
+        // and APNs location pushes still work, so we power GPS back up the
+        // moment travel begins and power it down again when it stops.
+        let geo = BGConfig.sharedInstance().geolocation
+        if !geo.continuousLocationUpdates && !isMoving {
+            BGLog.sharedInstance().notify(
+                "continuousLocationUpdates=false & stationary → GPS stays off",
+                debug: true
+            )
+            return
+        }
         guard !isUpdatingLocation else { return }
         _mutateCL { mgr in
             mgr.startUpdatingLocation()
@@ -279,10 +292,12 @@ import UIKit
     }
 
     private func setMoving(_ moving: Bool) {
+        let geo = BGConfig.sharedInstance().geolocation
         // Continuous keep-alive ("ride app") mode: never relinquish the moving
-        // state, so GPS stays on and the app stays alive in the background with
-        // the location indicator. Ignore stationary transitions entirely.
-        if !moving && BGConfig.sharedInstance().geolocation.disableStopDetection {
+        // state, so GPS stays on. BUT only when continuous updates are allowed —
+        // with continuousLocationUpdates=false we MUST honor the stationary
+        // transition so GPS powers down when the user stops moving.
+        if !moving && geo.disableStopDetection && geo.continuousLocationUpdates {
             return
         }
         let wasMoving = isMoving
