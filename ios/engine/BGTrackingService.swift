@@ -209,7 +209,9 @@ import UIKit
         guard isEnabled else { return }
         let geo = BGConfig.sharedInstance().geolocation
         _mutateCL { mgr in
-            if geo.disableStopDetection || (self.isMoving && !geo.useSignificantChangesOnly) {
+            // Keep-alive forces GPS on only when continuousLocationUpdates is
+            // also enabled; with it off, GPS runs only while actually moving.
+            if (geo.disableStopDetection && geo.continuousLocationUpdates) || (self.isMoving && !geo.useSignificantChangesOnly) {
                 mgr.startUpdatingLocation()
                 self.isUpdatingLocation = true
             } else {
@@ -563,9 +565,12 @@ import UIKit
                 startMonitoringStationaryRegion(loc, radius: config.geolocation.stationaryRadius)
             }
             startMonitoringSignificantLocationChanges()
-            // Keep GPS running in continuous keep-alive mode; otherwise tear it
-            // down to save battery and rely on SLC/region wakeups.
-            if !BGConfig.sharedInstance().geolocation.disableStopDetection {
+            // Tear down continuous GPS when going stationary UNLESS keep-alive
+            // mode is on. continuousLocationUpdates=false overrides keep-alive:
+            // it must power GPS down when stationary (motion-gated battery saver),
+            // relying on SLC/region wakeups + APNs pushes instead.
+            let geo = BGConfig.sharedInstance().geolocation
+            if !geo.disableStopDetection || !geo.continuousLocationUpdates {
                 stopUpdatingLocation()
             }
         }
@@ -724,7 +729,7 @@ import UIKit
         // app is never suspended (this is what shows the status-bar indicator and
         // is how ride apps stay alive). Otherwise downgrade to SLC + stationary
         // region to save battery.
-        if geo.disableStopDetection || (isMoving && !geo.useSignificantChangesOnly) {
+        if (geo.disableStopDetection && geo.continuousLocationUpdates) || (isMoving && !geo.useSignificantChangesOnly) {
             startUpdatingLocation()
         } else {
             startMonitoringSignificantLocationChanges()
