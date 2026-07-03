@@ -302,12 +302,16 @@ import UIKit
         if !moving && geo.disableStopDetection && geo.continuousLocationUpdates {
             return
         }
+
         let wasMoving = isMoving
         isMoving = moving
 
         if moving && !wasMoving {
             beginStartDetection(moving)
         } else if !moving && wasMoving {
+            // Arm the stop-detection countdown. GPS is actually powered down when
+            // it elapses (detectStopMotion → onMotionChangeSuccess(false)). If the
+            // user starts moving again first, beginStartDetection() cancels it.
             beginStopDetection()
         }
     }
@@ -344,6 +348,7 @@ import UIKit
         let stopTimeout = config.geolocation.stopTimeout * 60
 
         stopDetectionDelayTimer = Timer.scheduledTimer(withTimeInterval: stopTimeout, repeats: false) { [weak self] _ in
+            self?.stopDetectionDelayTimer = nil
             self?.detectStopMotion(nil)
         }
     }
@@ -366,7 +371,11 @@ import UIKit
     }
 
     @objc public func detectStopMotion(_ location: CLLocation?) {
-        guard isMoving else { return }
+        // No `guard isMoving`: this is the terminal stop, fired by the
+        // stop-detection timer AFTER setMoving() already cleared isMoving. The
+        // timer is cancelled by beginStartDetection() if the user resumes moving,
+        // so reaching here means the stop is real — power GPS down. Idempotent if
+        // GPS is already off (stopUpdatingLocation guards on isUpdatingLocation).
         isMoving = false
         let loc = location ?? lastGoodLocation
         onMotionChangeSuccess(false, location: loc, didPersist: false)
@@ -550,6 +559,9 @@ import UIKit
         ])
 
         if moving {
+            // Cancel any pending stop countdown — movement resumed, so GPS must
+            // stay on and must not be powered down by a stale stop timer.
+            endStopDetection()
             stopMonitoringStationaryRegion()
             startMonitoringSignificantLocationChanges()
             startUpdatingLocation()
