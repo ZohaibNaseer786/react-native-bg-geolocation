@@ -105,12 +105,12 @@ export interface GeolocationConfig {
   stopDetectionDelay?: number;
   disableStopDetection?: boolean;
   /**
-   * iOS. Motion-gated battery saver. When `false`, full-power GPS runs **only
-   * while the user is moving** — the engine automatically turns continuous GPS
-   * on at motion onset (so travel is tracked and sent to your server) and turns
-   * it off again when the user stops. While stationary it relies on low-power
-   * motion detection, significant-change / region relaunch, and APNs location
-   * pushes. When `true`, GPS tracks continuously regardless of motion.
+   * iOS. Battery saver. When `false`, the engine **never runs continuous GPS**
+   * in the foreground or background — not even while moving. Location comes only
+   * from the APNs Location Push Service Extension and on-demand
+   * `getCurrentPosition()`; low-power kill-state monitoring (significant-change /
+   * region relaunch) still runs. Use this when server-triggered location pushes
+   * fully replace continuous tracking. When `true`, GPS tracks continuously.
    * Default `true`.
    */
   continuousLocationUpdates?: boolean;

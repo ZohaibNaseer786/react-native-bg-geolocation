@@ -171,15 +171,14 @@ import UIKit
     // MARK: - Location updating
 
     @objc public func startUpdatingLocation() {
-        // Battery saver: when continuousLocationUpdates is false, run full-power
-        // GPS ONLY while the user is moving. When stationary, skip it — the
-        // engine still detects motion onset (motion coprocessor / SLC / region)
-        // and APNs location pushes still work, so we power GPS back up the
-        // moment travel begins and power it down again when it stops.
-        let geo = BGConfig.sharedInstance().geolocation
-        if !geo.continuousLocationUpdates && !isMoving {
+        // Battery saver: when continuousLocationUpdates is false, NEVER run
+        // continuous full-power GPS in fg/bg — not even while moving. Location is
+        // obtained only from the APNs Location Push Service Extension and
+        // on-demand getCurrentPosition(). Low-power SLC/region monitoring still
+        // runs for kill-state relaunch.
+        if !BGConfig.sharedInstance().geolocation.continuousLocationUpdates {
             BGLog.sharedInstance().notify(
-                "continuousLocationUpdates=false & stationary → GPS stays off",
+                "continuousLocationUpdates=false → continuous GPS disabled (push-only)",
                 debug: true
             )
             return
@@ -209,9 +208,9 @@ import UIKit
         guard isEnabled else { return }
         let geo = BGConfig.sharedInstance().geolocation
         _mutateCL { mgr in
-            // Keep-alive forces GPS on only when continuousLocationUpdates is
-            // also enabled; with it off, GPS runs only while actually moving.
-            if (geo.disableStopDetection && geo.continuousLocationUpdates) || (self.isMoving && !geo.useSignificantChangesOnly) {
+            // continuousLocationUpdates=false disables continuous GPS entirely
+            // (push-only). Otherwise: keep-alive OR moving keeps GPS running.
+            if geo.continuousLocationUpdates && (geo.disableStopDetection || (self.isMoving && !geo.useSignificantChangesOnly)) {
                 mgr.startUpdatingLocation()
                 self.isUpdatingLocation = true
             } else {
@@ -741,7 +740,7 @@ import UIKit
         // app is never suspended (this is what shows the status-bar indicator and
         // is how ride apps stay alive). Otherwise downgrade to SLC + stationary
         // region to save battery.
-        if (geo.disableStopDetection && geo.continuousLocationUpdates) || (isMoving && !geo.useSignificantChangesOnly) {
+        if geo.continuousLocationUpdates && (geo.disableStopDetection || (isMoving && !geo.useSignificantChangesOnly)) {
             startUpdatingLocation()
         } else {
             startMonitoringSignificantLocationChanges()

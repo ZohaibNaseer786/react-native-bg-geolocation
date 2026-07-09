@@ -20,12 +20,13 @@ import CoreLocation
     // and tracks continuously instead of relying on motion/region wakeups.
     // Higher battery cost; far more reliable background tracking.
     @objc public var disableStopDetection: Bool = false
-    // Motion-gated battery saver. When false, full-power GPS runs ONLY while the
-    // user is moving: the engine auto-enables continuous GPS on motion onset and
-    // powers it down again when the user stops (overriding disableStopDetection
-    // keep-alive). While stationary it relies on low-power motion detection,
-    // significant-location-change / region relaunch, and APNs location pushes.
-    // When true, GPS tracks continuously regardless of motion. Default true.
+    // Battery saver. When false, the engine NEVER runs continuous full-power GPS
+    // in the foreground or background — not even while the user is moving.
+    // Location comes only from the APNs Location Push Service Extension and
+    // on-demand getCurrentPosition(); low-power SLC/region monitoring still runs
+    // for kill-state relaunch. Use this when server-triggered location pushes
+    // fully replace continuous tracking. When true, GPS tracks continuously
+    // (subject to stop-detection / disableStopDetection). Default true.
     @objc public var continuousLocationUpdates: Bool = true
     @objc public var locationAuthorizationRequest: String = "Always"
     @objc public var locationAuthorizationAlert: [String: String] = [:]
