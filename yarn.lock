@@ -7774,14 +7774,14 @@ __metadata:
   linkType: hard
 
 "socket.io-client@npm:^4.8.1":
-  version: 4.8.3
-  resolution: "socket.io-client@npm:4.8.3"
+  version: 4.8.4
+  resolution: "socket.io-client@npm:4.8.4"
   dependencies:
     "@socket.io/component-emitter": "npm:~3.1.0"
     debug: "npm:~4.4.1"
     engine.io-client: "npm:~6.6.1"
     socket.io-parser: "npm:~4.2.4"
-  checksum: 10/ee83c08cb3a6f6c450e484b03036a0d853ceb62825f8f1093146298b63eccf86c7fdd1958d68940f8b7a8766b80bb4b30c7815b2811733edda74b21ff002e1d4
+  checksum: 10/9b39697b00db989b23caf2f1c0cd15d71c734a50281febd3de0eaf448b89a16758d2ba89b57be05ba6fc435f4127e64908cd59d3e878cb36a97954aa376d7042
   languageName: node
   linkType: hard
 
