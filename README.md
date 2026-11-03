@@ -376,6 +376,14 @@ yarn example android   # or: yarn example ios
 If this package saves you time, please consider giving the repo a star. It helps
 other React Native developers discover the project.
 
+## Open-source project context
+
+`react-native-bg-geolocation` is an MIT-licensed React Native library for reliable background location tracking across iOS and Android. It addresses difficult mobile lifecycle scenarios, including OS relaunch, Android Headless JS, iOS force-quit delivery through the Location Push Service Extension, geofencing, motion detection, reboot persistence, Live Activities, and native Socket.IO/REST delivery.
+
+The project is designed to give React Native developers a production-oriented foundation for complex background-location workflows. Areas of ongoing maintenance include native platform compatibility, automated testing, documentation, contributor onboarding, CI/CD, release quality, and Expo integration.
+
+If you use this library, please share feedback through [GitHub Issues](https://github.com/ZohaibNaseer786/react-native-bg-geolocation/issues) or contribute through a pull request. Bug reports, platform-specific testing, documentation improvements, and integration examples are especially welcome.
+
 <div align="center">
 
 ### Would you like to support me?
