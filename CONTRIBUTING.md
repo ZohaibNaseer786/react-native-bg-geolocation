@@ -83,11 +83,32 @@ The `package.json` file contains various scripts for common tasks:
 
 - `yarn`: setup project by installing dependencies.
 - `yarn typecheck`: type-check files with TypeScript.
-  - `yarn lint`: lint files with [ESLint](https://eslint.org/).
-    - `yarn example start`: start the Metro server for the example app.
+- `yarn lint`: lint files with [ESLint](https://eslint.org/).
+- `yarn example start`: start the Metro server for the example app.
 - `yarn example android`: run the example app on Android.
 - `yarn example ios`: run the example app on iOS.
-  
+
+### Android JDK
+
+React Native's NDK build fails on JDK 24+. Use JDK 17–21 and point Gradle at it
+from your machine, not from the repo:
+
+```sh
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)   # macOS
+```
+
+or add `org.gradle.java.home=/path/to/jdk-21` to `~/.gradle/gradle.properties`.
+
+### Adding a native method or config key
+
+The JS spec drives codegen for both platforms, so every addition needs three parts:
+
+1. `src/NativeBgGeolocation.ts` (TurboModule spec) and `src/types.ts` (public types + doc comment).
+2. iOS implementation in `ios/BgGeolocation.mm` / the Swift engine under `ios/engine`.
+3. An Android override in `android/src/main/java/com/bggeolocation/BgGeolocationModule.kt` — even a no-op for iOS-only features — otherwise `compileDebugKotlin` fails.
+
+Add an entry under `[Unreleased]` in `CHANGELOG.md`.
+
 ### Sending a pull request
 
 > **Working on your first pull request?** You can learn how from this _free_ series: [How to Contribute to an Open Source Project on GitHub](https://app.egghead.io/playlists/how-to-contribute-to-an-open-source-project-on-github).

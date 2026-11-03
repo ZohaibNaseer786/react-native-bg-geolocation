@@ -92,3 +92,6 @@ android/generated
 
 # React Native Nitro Modules
 nitrogen/
+
+# Redis dumps (never belongs in the repo)
+*.rdb

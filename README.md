@@ -15,6 +15,11 @@
 [![GitHub stars](https://img.shields.io/github/stars/ZohaibNaseer786/react-native-bg-geolocation?style=for-the-badge&logo=github)](https://github.com/ZohaibNaseer786/react-native-bg-geolocation/stargazers)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=111111)](https://buymeacoffee.com/zohaibnaseer)
 
+[![CI](https://img.shields.io/github/actions/workflow/status/ZohaibNaseer786/react-native-bg-geolocation/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/ZohaibNaseer786/react-native-bg-geolocation/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/ZohaibNaseer786/react-native-bg-geolocation?style=flat-square&label=OpenSSF%20Scorecard)](https://scorecard.dev/viewer/?uri=github.com/ZohaibNaseer786/react-native-bg-geolocation)
+[![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-E05735?style=flat-square)](CHANGELOG.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
+
 `react-native-bg-geolocation` helps React Native apps collect and deliver reliable location updates with **foreground tracking**, **background tracking**, **geofencing**, **motion detection**, **Socket.IO / REST delivery**, **Android headless JS**, **iOS Live Activity**, and **iOS force-quit location push support**.
 
 **Foreground Tracking | Background Tracking | Kill-State Delivery | Geofencing | Motion Detection | Socket.IO + REST Fallback | iOS Location Push | Android Headless JS**
@@ -35,6 +40,26 @@
 - ✅ Geofencing (`CLCircularRegion` / `GeofencingClient`)
 - ✅ Reboot persistence
 - ✅ Same API shape as `react-native-background-geolocation` (`AuthorizationStatus`, `DesiredAccuracy`, nested `Config`, etc.)
+
+## Why this library?
+
+Most React Native location libraries stop working the moment the user force-quits the app. The only widely used option that handles the full background lifecycle is commercial. `react-native-bg-geolocation` is an MIT alternative that goes one step further on iOS with Apple's Location Push Service Extension.
+
+| | react-native-bg-geolocation | react-native-background-geolocation (Transistor) | react-native-geolocation-service | @react-native-community/geolocation |
+|---|:---:|:---:|:---:|:---:|
+| License | **MIT** | Proprietary — paid license for Android release builds | MIT | MIT |
+| Foreground tracking | ✅ | ✅ | ✅ | ✅ |
+| Background tracking (app alive) | ✅ | ✅ | ⚠️ manual | ⚠️ manual |
+| Motion-based start/stop (battery) | ✅ | ✅ | ❌ | ❌ |
+| Geofencing | ✅ | ✅ | ❌ | ❌ |
+| Android Headless JS (process killed) | ✅ | ✅ | ❌ | ❌ |
+| iOS relaunch via significant-change / regions | ✅ | ✅ | ❌ | ❌ |
+| **iOS force-quit delivery (Location Push Service Extension)** | **✅ server-triggered** | ❌ | ❌ | ❌ |
+| Native Socket.IO delivery + REST fallback | ✅ | REST only | ❌ | ❌ |
+| iOS Live Activity status | ✅ | ❌ | ❌ | ❌ |
+| New Architecture (TurboModule) | ✅ | ✅ | ✅ | ✅ |
+
+> Comparison reflects public documentation at the time of writing. Open an issue if something is out of date.
 
 ## Installation
 
@@ -398,6 +423,7 @@ If you use this library, please share feedback through [GitHub Issues](https://g
 
 - [Development workflow](CONTRIBUTING.md#development-workflow)
 - [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
+- [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## License
 
